@@ -1,0 +1,35 @@
+node_modules
+.env
+.vscode
+
+# formatter
+.prettierrc
+
+# remixd
+/.states
+
+# cache files
+/cache
+/cache_forge
+/artifacts
+/out
+/abi
+
+# Foundry
+/broadcast
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+lcov.info
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+
+# tempory files
+script/temp.sol
+test/temp.sol
