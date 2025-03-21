@@ -4,20 +4,17 @@ pragma solidity ^0.8.27;
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract PartnerUpgradeable is AccessControlUpgradeable {
-    event Distribute(uint256 strategyId, uint256 amount);
-    event Claim();
-    event Withdraw();
-    event Transfer(address token, address to, uint256 amount);
-    event Burn(uint256 amount);
+import {IPartner} from "./interfaces/IPartner.sol";
 
+contract PartnerUpgradeable is IPartner, AccessControlUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     function initialize(address _owner, address _manager) public initializer {
-        grantRole(DEFAULT_ADMIN_ROLE, _owner);
-        grantRole(ADMIN_ROLE, _owner);
-        grantRole(MANAGER_ROLE, _manager);
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(ADMIN_ROLE, _owner);
+        _grantRole(MANAGER_ROLE, _manager);
     }
 
     function strategy1(uint256 _amount) public onlyRole(ADMIN_ROLE) {
@@ -40,7 +37,11 @@ contract PartnerUpgradeable is AccessControlUpgradeable {
         address _to,
         uint256 _amount
     ) public onlyRole(ADMIN_ROLE) {
-        IERC20(_token).transfer(_to, _amount);
+        if (_token == address(0)) {
+            payable(_to).transfer(_amount);
+        } else {
+            IERC20(_token).transfer(_to, _amount);
+        }
         emit Transfer(_token, _to, _amount);
     }
 
@@ -51,4 +52,6 @@ contract PartnerUpgradeable is AccessControlUpgradeable {
         payable(address(0)).transfer(_amount);
         emit Burn(_amount);
     }
+
+    receive() external payable {}
 }
