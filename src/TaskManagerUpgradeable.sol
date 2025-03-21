@@ -141,17 +141,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     }
 
     /**
-     * @dev Claim funds for all partners.
-     * Loops through all partners and calls their `claim` function.
-     */
-    function claimAll() public {
-        address[] memory partnerList = partners.values();
-        for (uint256 i = 0; i < partnerList.length; i++) {
-            IPartner(partnerList[i]).claim();
-        }
-    }
-
-    /**
      * @dev Burn a task after its staking period has ended.
      * Only callable if the task is in the 'fulfilled' state.
      */

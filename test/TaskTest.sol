@@ -10,9 +10,6 @@ import {PartnerUpgradeable} from "../src/PartnerUpgradeable.sol";
 import {MockBridge} from "../src/mocks/MockBridge.sol";
 
 contract TaskTest is Test {
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
-
     TaskManagerUpgradeable public taskManager;
     PartnerUpgradeable public partnerContract;
     MockBridge public mockBridge;

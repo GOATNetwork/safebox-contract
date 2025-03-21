@@ -17,21 +17,6 @@ contract PartnerUpgradeable is IPartner, AccessControlUpgradeable {
         _grantRole(MANAGER_ROLE, _manager);
     }
 
-    function strategy1(uint256 _amount) public onlyRole(ADMIN_ROLE) {
-        // ...
-        emit Distribute(1, _amount);
-    }
-
-    function claim() public {
-        // ...
-        emit Claim();
-    }
-
-    function withdraw() public onlyRole(ADMIN_ROLE) {
-        // ...
-        emit Withdraw();
-    }
-
     function transfer(
         address _token,
         address _to,
@@ -46,9 +31,7 @@ contract PartnerUpgradeable is IPartner, AccessControlUpgradeable {
     }
 
     function burn(uint256 _amount) public onlyRole(MANAGER_ROLE) {
-        if (address(this).balance < _amount) {
-            withdraw();
-        }
+        require(address(this).balance >= _amount, "Insufficient balance");
         payable(address(0)).transfer(_amount);
         emit Burn(_amount);
     }
