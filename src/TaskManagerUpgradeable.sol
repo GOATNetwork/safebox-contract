@@ -46,6 +46,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     // Array of tasks
     Task[] public tasks;
+    mapping(address partner => uint256[]) public partnerTasks;
 
     // Constructor to initialize immutable variables
     constructor(address _partnerBeacon, address _bridge) {
@@ -65,6 +66,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     function isPartner(address _partner) public view returns (bool) {
         return partners.contains(_partner);
+    }
+
+    function getPartnerTasks(
+        address _partner
+    ) public view returns (uint256[] memory) {
+        return partnerTasks[_partner];
     }
 
     /**
@@ -90,6 +97,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function removePartner(address _partiner) public onlyRole(ADMIN_ROLE) {
         partners.remove(_partiner);
+        delete partnerTasks[_partiner];
         emit PartnerRemoved(_partiner);
     }
 
@@ -105,6 +113,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         string memory _btcAddress
     ) public onlyRole(ADMIN_ROLE) {
         require(partners.contains(_partner), "Invalid partner");
+        uint256 taskId = tasks.length;
         tasks.push(
             Task({
                 partner: _partner,
@@ -116,7 +125,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                 btcAddress: _btcAddress
             })
         );
-        emit TaskCreated(tasks.length - 1);
+        partnerTasks[_partner].push(taskId);
+        emit TaskCreated(taskId);
     }
 
     /**
@@ -135,6 +145,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             address(tasks[_taskId].partner).balance >= tasks[_taskId].amount,
             "Insufficient funds received"
         );
+        IPartner(tasks[_taskId].partner).credit(tasks[_taskId].amount);
         tasks[_taskId].fulfilledTime = uint32(block.timestamp);
         tasks[_taskId].state = 2; // Task state is set to 'fulfilled'
         emit FundsReceived(_taskId, _txHash, _txOut);

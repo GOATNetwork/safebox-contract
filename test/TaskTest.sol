@@ -73,7 +73,15 @@ contract TaskTest is Test {
             uint256 amount,
             string memory btcAddress
         ) = taskManager.tasks(taskId);
+        assertEq(partner, partnerAddress);
         assertEq(state, 1);
+        assertEq(stakingPeriod, 90 days);
+        assertEq(deadline, 1 days);
+        assertEq(fulfilledTime, 0);
+        assertEq(amount, 1 ether);
+        assertEq(btcAddress, "btcAddress");
+        assertEq(taskManager.partnerTasks(partnerAddress, 0), taskId);
+        assertEq(taskManager.getPartnerTasks(partnerAddress).length, 1);
 
         // Send funds to the partner contract
         // @dev using call remove gas limitation
@@ -86,14 +94,7 @@ contract TaskTest is Test {
 
         // admin transfer funds
         vm.prank(admin);
-        partnerContract.transfer(address(0), address(100), 1 ether);
-
-        // burn failed due to insufficient balance
-        vm.expectRevert();
-        taskManager.burn(taskId);
-
-        // transfer funds back to the partner contract
-        partnerAddress.call{value: 1 ether}("");
+        partnerContract.transfer(address(100), 1 ether);
 
         // failed to burn due to time not reached
         vm.expectRevert("Time not reached");
@@ -101,6 +102,13 @@ contract TaskTest is Test {
 
         // skip time
         skip(90 days);
+
+        // burn failed due to insufficient balance
+        vm.expectRevert();
+        taskManager.burn(taskId);
+
+        // transfer funds back to the partner contract
+        partnerContract.returnFunds{value: 1 ether}();
 
         // burn funds
         taskManager.burn(taskId);

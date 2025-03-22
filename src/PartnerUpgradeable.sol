@@ -10,6 +10,9 @@ contract PartnerUpgradeable is IPartner, AccessControlUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
+    uint256 public balance;
+    uint256 public allowance;
+
     function initialize(address _owner, address _manager) public initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
@@ -18,23 +21,36 @@ contract PartnerUpgradeable is IPartner, AccessControlUpgradeable {
     }
 
     function transfer(
-        address _token,
         address _to,
         uint256 _amount
     ) public onlyRole(ADMIN_ROLE) {
-        if (_token == address(0)) {
-            payable(_to).transfer(_amount);
-        } else {
-            IERC20(_token).transfer(_to, _amount);
-        }
-        emit Transfer(_token, _to, _amount);
+        require(allowance >= _amount, "Insufficient allowance");
+        allowance -= _amount;
+        payable(_to).transfer(_amount);
+        emit Transfer(_to, _amount);
+    }
+
+    function returnFunds() public payable {
+        allowance += msg.value;
+        require(allowance <= balance, "Exceeded balance");
+        emit ReturnFunds(msg.value);
+    }
+
+    function credit(uint256 _amount) public onlyRole(MANAGER_ROLE) {
+        allowance += _amount;
+        require(allowance <= balance, "Exceeded balance");
+        emit Credit(_amount);
     }
 
     function burn(uint256 _amount) public onlyRole(MANAGER_ROLE) {
-        require(address(this).balance >= _amount, "Insufficient balance");
+        require(balance >= _amount, "Insufficient balance");
+        balance -= _amount;
+        allowance -= _amount;
         payable(address(0)).transfer(_amount);
         emit Burn(_amount);
     }
 
-    receive() external payable {}
+    receive() external payable {
+        balance += msg.value;
+    }
 }
