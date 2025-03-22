@@ -7,7 +7,7 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 
 import {IBridge} from "./interfaces/IBridge.sol";
 import {IPartner} from "./interfaces/IPartner.sol";
-// import {console} from "forge-std/console.sol";
+
 /**
  * @title TaskManagerUpgradeable
  * @dev Contract for managing tasks and partners.
@@ -26,9 +26,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     struct Task {
         address partner; // Address of the associated partner
         uint8 state; // Task state: 0 (default), 1 (created), 2 (fulfilled), 3 (burned)
-        uint24 stakingPeriod; // The minimum staking period, max of 194 days.
+        uint32 stakingPeriod; // The minimum staking period
         uint32 deadline; // Timestamp when the task is considered expired
         uint32 fulfilledTime; // Timestamp when the funds are received
+        uint32 txOut; // txOut of the bridge tx
+        bytes32 txHash; // txHash of the bridge tx
+        bytes32 witnessScript; // witnessScript of the btc timelock
         uint256 amount; // Amount of funds associated with the task
         string btcAddress; // Bitcoin address associated with the task
     }
@@ -121,6 +124,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                 stakingPeriod: _stakingPeriod,
                 deadline: _deadline,
                 fulfilledTime: 0,
+                txOut: 0,
+                txHash: 0,
+                witnessScript: 0,
                 amount: _amount,
                 btcAddress: _btcAddress
             })
@@ -136,7 +142,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     function receiveFunds(
         uint256 _taskId,
         bytes32 _txHash,
-        uint32 _txOut
+        uint32 _txOut,
+        bytes32 _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
         require(tasks[_taskId].state == 1, "Invalid task");
         require(IBridge(bridge).isDeposited(_txHash, _txOut), "Tx not found");
@@ -146,8 +153,11 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             "Insufficient funds received"
         );
         IPartner(tasks[_taskId].partner).credit(tasks[_taskId].amount);
-        tasks[_taskId].fulfilledTime = uint32(block.timestamp);
         tasks[_taskId].state = 2; // Task state is set to 'fulfilled'
+        tasks[_taskId].fulfilledTime = uint32(block.timestamp);
+        tasks[_taskId].txHash = _txHash;
+        tasks[_taskId].txOut = _txOut;
+        tasks[_taskId].witnessScript = _witnessScript;
         emit FundsReceived(_taskId, _txHash, _txOut);
     }
 

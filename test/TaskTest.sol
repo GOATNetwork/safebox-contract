@@ -67,9 +67,12 @@ contract TaskTest is Test {
         (
             address partner,
             uint8 state,
-            uint24 stakingPeriod,
+            uint32 stakingPeriod,
             uint32 deadline,
             uint32 fulfilledTime,
+            uint32 txOut,
+            bytes32 txHash,
+            bytes32 witnessScript,
             uint256 amount,
             string memory btcAddress
         ) = taskManager.tasks(taskId);
@@ -90,7 +93,23 @@ contract TaskTest is Test {
 
         // receive funds
         vm.prank(relayer);
-        taskManager.receiveFunds(0, "Tx Hash", 1234);
+        taskManager.receiveFunds(0, "Tx Hash", 1234, "Witness Script");
+        (
+            partner,
+            state,
+            stakingPeriod,
+            deadline,
+            fulfilledTime,
+            txOut,
+            txHash,
+            witnessScript,
+            amount,
+            btcAddress
+        ) = taskManager.tasks(taskId);
+        assertEq(state, 2);
+        assertEq(txOut, 1234);
+        assertEq(txHash, "Tx Hash");
+        assertEq(witnessScript, "Witness Script");
 
         // admin transfer funds
         vm.prank(admin);
