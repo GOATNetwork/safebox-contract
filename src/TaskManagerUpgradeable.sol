@@ -31,13 +31,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     struct Task {
         address partner; // Address of the associated partner
         uint8 state; // Task state: 0 (default), 1 (created), 2 (fulfilled), 3 (burned)
-        uint32 stakingPeriod; // The minimum staking period
+        uint32 timelockEndTime; // Timestamp when the timelock of the funds expires
         uint32 deadline; // Timestamp when the task is considered expired
-        uint32 fulfilledTime; // Timestamp when the funds are received
+        uint128 amount; // Amount of funds associated with the task
         uint32 txOut; // txOut of the bridge tx
         bytes32 txHash; // txHash of the bridge tx
         bytes32 witnessScript; // witnessScript of the btc timelock
-        uint256 amount; // Amount of funds associated with the task
         string btcAddress; // Bitcoin address associated with the task
     }
 
@@ -115,24 +114,27 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function setupTask(
         address _partner,
-        uint24 _stakingPeriod,
+        uint32 _timelockEndTime,
         uint32 _deadline,
-        uint256 _amount,
+        uint128 _amount,
         string memory _btcAddress
     ) public onlyRole(ADMIN_ROLE) {
         require(partners.contains(_partner), "Invalid partner");
+        require(_timelockEndTime > block.timestamp, "Invalid timelock");
+        require(_deadline > block.timestamp, "Invalid deadline");
+        require(_amount > 0, "Invalid amount");
+        require(bytes(_btcAddress).length > 0, "Invalid btc address");
         uint256 taskId = tasks.length;
         tasks.push(
             Task({
                 partner: _partner,
                 state: 1, // Task state is set to 'created'
-                stakingPeriod: _stakingPeriod,
+                timelockEndTime: _timelockEndTime,
                 deadline: _deadline,
-                fulfilledTime: 0,
+                amount: _amount,
                 txOut: 0,
                 txHash: 0,
                 witnessScript: 0,
-                amount: _amount,
                 btcAddress: _btcAddress
             })
         );
@@ -145,23 +147,18 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      * Only callable by accounts with the RELAYER_ROLE.
      */
     function receiveFunds(
-        uint256 _amount,
+        uint128 _amount,
         uint256 _taskId,
         bytes32 _txHash,
         uint32 _txOut,
         bytes32 _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
         require(tasks[_taskId].state == 1, "Invalid task");
+        require(block.timestamp <= tasks[_taskId].deadline, "Task expired");
         require(_amount == tasks[_taskId].amount, "Invalid amount");
         require(IBridge(bridge).isDeposited(_txHash, _txOut), "Tx not found");
-        // TODO: better way to check if funds are received?
-        require(
-            address(tasks[_taskId].partner).balance >= _amount,
-            "Insufficient funds received"
-        );
         IPartner(tasks[_taskId].partner).credit(_amount);
         tasks[_taskId].state = 2; // Task state is set to 'fulfilled'
-        tasks[_taskId].fulfilledTime = uint32(block.timestamp);
         tasks[_taskId].txHash = _txHash;
         tasks[_taskId].txOut = _txOut;
         tasks[_taskId].witnessScript = _witnessScript;
@@ -175,8 +172,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     function burn(uint256 _taskId) public {
         require(tasks[_taskId].state == 2, "Invalid state");
         require(
-            block.timestamp >=
-                tasks[_taskId].fulfilledTime + tasks[_taskId].stakingPeriod,
+            block.timestamp >= tasks[_taskId].timelockEndTime,
             "Time not reached"
         );
         tasks[_taskId].state = 3; // Task state is set to 'burned'

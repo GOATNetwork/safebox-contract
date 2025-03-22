@@ -58,8 +58,8 @@ contract TaskTest is Test {
         vm.prank(admin);
         taskManager.setupTask(
             partnerAddress,
-            90 days,
-            1 days,
+            uint32(block.timestamp + 90 days),
+            uint32(block.timestamp + 1 days),
             1 ether,
             "btcAddress"
         );
@@ -67,20 +67,18 @@ contract TaskTest is Test {
         (
             address partner,
             uint8 state,
-            uint32 stakingPeriod,
+            uint32 timelockEndTime,
             uint32 deadline,
-            uint32 fulfilledTime,
+            uint128 amount,
             uint32 txOut,
             bytes32 txHash,
             bytes32 witnessScript,
-            uint256 amount,
             string memory btcAddress
         ) = taskManager.tasks(taskId);
         assertEq(partner, partnerAddress);
         assertEq(state, 1);
-        assertEq(stakingPeriod, 90 days);
-        assertEq(deadline, 1 days);
-        assertEq(fulfilledTime, 0);
+        assertEq(timelockEndTime, block.timestamp + 90 days);
+        assertEq(deadline, block.timestamp + 1 days);
         assertEq(amount, 1 ether);
         assertEq(btcAddress, "btcAddress");
         assertEq(taskManager.partnerTasks(partnerAddress, 0), taskId);
@@ -97,13 +95,12 @@ contract TaskTest is Test {
         (
             partner,
             state,
-            stakingPeriod,
+            timelockEndTime,
             deadline,
-            fulfilledTime,
+            amount,
             txOut,
             txHash,
             witnessScript,
-            amount,
             btcAddress
         ) = taskManager.tasks(taskId);
         assertEq(state, 2);
