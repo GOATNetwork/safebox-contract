@@ -93,7 +93,7 @@ contract TaskTest is Test {
 
         // receive funds
         vm.prank(relayer);
-        taskManager.receiveFunds(0, "Tx Hash", 1234, "Witness Script");
+        taskManager.receiveFunds(1 ether, 0, "Tx Hash", 1234, "Witness Script");
         (
             partner,
             state,

@@ -19,7 +19,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     event PartnerCreated(address partner);
     event PartnerRemoved(address partner);
     event TaskCreated(uint256 taskId);
-    event FundsReceived(uint256 taskId, bytes32 txHash, uint32 txOut);
+    event FundsReceived(
+        uint256 taskId,
+        bytes32 txHash,
+        uint32 txOut,
+        bytes32 witnessScript
+    );
     event Burned(uint256 taskId);
 
     // Struct representing a task
@@ -140,25 +145,27 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      * Only callable by accounts with the RELAYER_ROLE.
      */
     function receiveFunds(
+        uint256 _amount,
         uint256 _taskId,
         bytes32 _txHash,
         uint32 _txOut,
         bytes32 _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
         require(tasks[_taskId].state == 1, "Invalid task");
+        require(_amount == tasks[_taskId].amount, "Invalid amount");
         require(IBridge(bridge).isDeposited(_txHash, _txOut), "Tx not found");
         // TODO: better way to check if funds are received?
         require(
-            address(tasks[_taskId].partner).balance >= tasks[_taskId].amount,
+            address(tasks[_taskId].partner).balance >= _amount,
             "Insufficient funds received"
         );
-        IPartner(tasks[_taskId].partner).credit(tasks[_taskId].amount);
+        IPartner(tasks[_taskId].partner).credit(_amount);
         tasks[_taskId].state = 2; // Task state is set to 'fulfilled'
         tasks[_taskId].fulfilledTime = uint32(block.timestamp);
         tasks[_taskId].txHash = _txHash;
         tasks[_taskId].txOut = _txOut;
         tasks[_taskId].witnessScript = _witnessScript;
-        emit FundsReceived(_taskId, _txHash, _txOut);
+        emit FundsReceived(_taskId, _txHash, _txOut, _witnessScript);
     }
 
     /**
