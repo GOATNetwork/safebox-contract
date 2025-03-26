@@ -21,8 +21,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     event TaskCreated(uint256 taskId);
     event FundsReceived(
         uint256 taskId,
-        bytes32 txHash,
+        bytes32 fundingTxHash,
         uint32 txOut,
+        bytes32 timelockTxHash,
         bytes32 witnessScript
     );
     event Burned(uint256 taskId);
@@ -35,7 +36,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         uint32 deadline; // Timestamp when the task is considered expired
         uint128 amount; // Amount of funds associated with the task
         uint32 txOut; // txOut of the bridge tx
-        bytes32 txHash; // txHash of the bridge tx
+        bytes32 fundingTxHash; // Tx hash of the btc tx
+        bytes32 timelockTxHash; // Tx hash of the btc timelock
         bytes32 witnessScript; // witnessScript of the btc timelock
         string btcAddress; // Bitcoin address associated with the task
     }
@@ -133,7 +135,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                 deadline: _deadline,
                 amount: _amount,
                 txOut: 0,
-                txHash: 0,
+                fundingTxHash: 0,
+                timelockTxHash: 0,
                 witnessScript: 0,
                 btcAddress: _btcAddress
             })
@@ -149,20 +152,31 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     function receiveFunds(
         uint128 _amount,
         uint256 _taskId,
-        bytes32 _txHash,
+        bytes32 _fundingTxHash,
         uint32 _txOut,
+        bytes32 _timelockTxHash,
         bytes32 _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
         require(tasks[_taskId].state == 1, "Invalid task");
         require(block.timestamp <= tasks[_taskId].deadline, "Task expired");
         require(_amount == tasks[_taskId].amount, "Invalid amount");
-        require(IBridge(bridge).isDeposited(_txHash, _txOut), "Tx not found");
+        require(
+            IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
+            "Tx not found"
+        );
         IPartner(tasks[_taskId].partner).credit(_amount);
         tasks[_taskId].state = 2; // Task state is set to 'fulfilled'
-        tasks[_taskId].txHash = _txHash;
+        tasks[_taskId].fundingTxHash = _fundingTxHash;
+        tasks[_taskId].timelockTxHash = _timelockTxHash;
         tasks[_taskId].txOut = _txOut;
         tasks[_taskId].witnessScript = _witnessScript;
-        emit FundsReceived(_taskId, _txHash, _txOut, _witnessScript);
+        emit FundsReceived(
+            _taskId,
+            _fundingTxHash,
+            _txOut,
+            _timelockTxHash,
+            _witnessScript
+        );
     }
 
     /**

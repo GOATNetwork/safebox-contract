@@ -20,20 +20,17 @@ contract PartnerUpgradeable is IPartner, AccessControlUpgradeable {
         _grantRole(MANAGER_ROLE, _manager);
     }
 
-    function transfer(
-        address _to,
-        uint256 _amount
-    ) public onlyRole(ADMIN_ROLE) {
+    function take(address _to, uint256 _amount) public onlyRole(ADMIN_ROLE) {
         require(allowance >= _amount, "Insufficient allowance");
         allowance -= _amount;
         payable(_to).transfer(_amount);
-        emit Transfer(_to, _amount);
+        emit Take(_to, _amount);
     }
 
-    function returnFunds() public payable {
+    function give() public payable {
         allowance += msg.value;
         require(allowance <= balance, "Exceeded balance");
-        emit ReturnFunds(msg.value);
+        emit Give(msg.value);
     }
 
     function credit(uint256 _amount) public onlyRole(MANAGER_ROLE) {
@@ -48,6 +45,13 @@ contract PartnerUpgradeable is IPartner, AccessControlUpgradeable {
         allowance -= _amount;
         payable(address(0)).transfer(_amount);
         emit Burn(_amount);
+    }
+
+    function returnFunds(address _to, uint256 _amount) public {
+        require(_amount <= balance - allowance, "Invalid amount");
+        balance -= _amount;
+        payable(_to).transfer(_amount);
+        emit ReturnFunds(_amount);
     }
 
     receive() external payable {

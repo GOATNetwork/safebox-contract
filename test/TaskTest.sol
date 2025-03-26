@@ -71,7 +71,8 @@ contract TaskTest is Test {
             uint32 deadline,
             uint128 amount,
             uint32 txOut,
-            bytes32 txHash,
+            bytes32 fundingTxHash,
+            bytes32 timelockTxHash,
             bytes32 witnessScript,
             string memory btcAddress
         ) = taskManager.tasks(taskId);
@@ -91,7 +92,14 @@ contract TaskTest is Test {
 
         // receive funds
         vm.prank(relayer);
-        taskManager.receiveFunds(1 ether, 0, "Tx Hash", 1234, "Witness Script");
+        taskManager.receiveFunds(
+            1 ether,
+            0,
+            "Funding Tx Hash",
+            1234,
+            "Timelock Tx Hash",
+            "Witness Script"
+        );
         (
             partner,
             state,
@@ -99,18 +107,20 @@ contract TaskTest is Test {
             deadline,
             amount,
             txOut,
-            txHash,
+            fundingTxHash,
+            timelockTxHash,
             witnessScript,
             btcAddress
         ) = taskManager.tasks(taskId);
         assertEq(state, 2);
         assertEq(txOut, 1234);
-        assertEq(txHash, "Tx Hash");
+        assertEq(fundingTxHash, "Funding Tx Hash");
+        assertEq(timelockTxHash, "Timelock Tx Hash");
         assertEq(witnessScript, "Witness Script");
 
         // admin transfer funds
         vm.prank(admin);
-        partnerContract.transfer(address(100), 1 ether);
+        partnerContract.take(address(100), 1 ether);
 
         // failed to burn due to time not reached
         vm.expectRevert("Time not reached");
@@ -124,7 +134,7 @@ contract TaskTest is Test {
         taskManager.burn(taskId);
 
         // transfer funds back to the partner contract
-        partnerContract.returnFunds{value: 1 ether}();
+        partnerContract.give{value: 1 ether}();
 
         // burn funds
         taskManager.burn(taskId);
