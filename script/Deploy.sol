@@ -2,9 +2,7 @@ pragma solidity ^0.8.0;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
-import {PartnerUpgradeable} from "../src/PartnerUpgradeable.sol";
 
 import {MockBridge} from "../src/mocks/MockBridge.sol";
 
@@ -24,13 +22,7 @@ contract TaskTest is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // deploy contracts
-        PartnerUpgradeable partnerLogic = new PartnerUpgradeable();
-        UpgradeableBeacon partnerBeacon = new UpgradeableBeacon(
-            address(partnerLogic),
-            admin
-        );
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
-            address(partnerBeacon),
             goatBridge
         );
 
@@ -42,10 +34,6 @@ contract TaskTest is Script {
         console.log(
             "TaskManagerUpgradeable contract address: ",
             address(taskManager)
-        );
-        console.log(
-            "UpgradeableBeacon contract address: ",
-            address(partnerBeacon)
         );
 
         vm.stopBroadcast();

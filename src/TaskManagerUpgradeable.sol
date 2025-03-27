@@ -3,10 +3,8 @@ pragma solidity ^0.8.27;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 import {IBridge} from "./interfaces/IBridge.sol";
-import {IPartner} from "./interfaces/IPartner.sol";
 
 /**
  * @title TaskManagerUpgradeable
@@ -16,8 +14,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // Events for logging important actions
-    event PartnerCreated(address partner);
-    event PartnerRemoved(address partner);
+    event PartnerCreated(uint256 partnerId);
+    event PartnerRemoved(uint256 partnerId);
     event TaskCreated(uint256 taskId);
     event FundsReceived(
         uint256 taskId,
@@ -30,7 +28,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     // Struct representing a task
     struct Task {
-        address partner; // Address of the associated partner
+        uint256 partnerId; // Address of the associated partner
+        address depositAddress; // Address where the funds are deposited
         uint8 state; // Task state: 0 (default), 1 (created), 2 (fulfilled), 3 (burned)
         uint32 timelockEndTime; // Timestamp when the timelock of the funds expires
         uint32 deadline; // Timestamp when the task is considered expired
@@ -50,16 +49,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     address public immutable partnerBeacon;
     address public immutable bridge;
 
-    // Set of partner addresses
-    EnumerableSet.AddressSet private partners;
-
     // Array of tasks
     Task[] public tasks;
-    mapping(address partner => uint256[]) public partnerTasks;
+    mapping(uint256 partnerId => uint256[]) public partnerTasks;
 
     // Constructor to initialize immutable variables
-    constructor(address _partnerBeacon, address _bridge) {
-        partnerBeacon = _partnerBeacon;
+    constructor(address _bridge) {
         bridge = _bridge;
     }
 
@@ -69,45 +64,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function getPartner(uint256 _index) public view returns (address) {
-        return partners.at(_index);
-    }
-
-    function isPartner(address _partner) public view returns (bool) {
-        return partners.contains(_partner);
-    }
-
     function getPartnerTasks(
-        address _partner
+        uint256 _partnerId
     ) public view returns (uint256[] memory) {
-        return partnerTasks[_partner];
-    }
-
-    /**
-     * @dev Create a new partner by deploying a BeaconProxy.
-     * Only callable by accounts with the ADMIN_ROLE.
-     */
-    function createPartner() public onlyRole(ADMIN_ROLE) {
-        BeaconProxy partnerProxy = new BeaconProxy(
-            partnerBeacon,
-            abi.encodeWithSelector(
-                IPartner.initialize.selector,
-                msg.sender,
-                address(this)
-            )
-        );
-        partners.add(address(partnerProxy));
-        emit PartnerCreated(address(partnerProxy));
-    }
-
-    /**
-     * @dev Remove an existing partner.
-     * Only callable by accounts with the ADMIN_ROLE.
-     */
-    function removePartner(address _partiner) public onlyRole(ADMIN_ROLE) {
-        partners.remove(_partiner);
-        delete partnerTasks[_partiner];
-        emit PartnerRemoved(_partiner);
+        return partnerTasks[_partnerId];
     }
 
     /**
@@ -115,13 +75,13 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      * Only callable by accounts with the ADMIN_ROLE.
      */
     function setupTask(
-        address _partner,
+        uint256 _partnerId,
+        address _depositAddress,
         uint32 _timelockEndTime,
         uint32 _deadline,
         uint128 _amount,
         string memory _btcAddress
     ) public onlyRole(ADMIN_ROLE) {
-        require(partners.contains(_partner), "Invalid partner");
         require(_timelockEndTime > block.timestamp, "Invalid timelock");
         require(_deadline > block.timestamp, "Invalid deadline");
         require(_amount > 0, "Invalid amount");
@@ -129,7 +89,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         uint256 taskId = tasks.length;
         tasks.push(
             Task({
-                partner: _partner,
+                partnerId: _partnerId,
+                depositAddress: _depositAddress,
                 state: 1, // Task state is set to 'created'
                 timelockEndTime: _timelockEndTime,
                 deadline: _deadline,
@@ -141,7 +102,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                 btcAddress: _btcAddress
             })
         );
-        partnerTasks[_partner].push(taskId);
+        partnerTasks[_partnerId].push(taskId);
         emit TaskCreated(taskId);
     }
 
@@ -164,7 +125,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
-        IPartner(tasks[_taskId].partner).credit(_amount);
         tasks[_taskId].state = 2; // Task state is set to 'fulfilled'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].timelockTxHash = _timelockTxHash;
@@ -190,7 +150,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             "Time not reached"
         );
         tasks[_taskId].state = 3; // Task state is set to 'burned'
-        IPartner(tasks[_taskId].partner).burn(tasks[_taskId].amount);
+        payable(address(0)).transfer(tasks[_taskId].amount);
         emit Burned(_taskId);
     }
 
@@ -201,7 +161,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     function forceBurn(uint256 _taskId) public onlyRole(ADMIN_ROLE) {
         require(tasks[_taskId].state == 2, "Invalid state");
         tasks[_taskId].state = 3; // Task state is set to 'burned'
-        IPartner(tasks[_taskId].partner).burn(tasks[_taskId].amount);
+        payable(address(0)).transfer(tasks[_taskId].amount);
         emit Burned(_taskId);
     }
+
+    receive() external payable {}
 }
