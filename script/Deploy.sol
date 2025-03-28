@@ -4,16 +4,16 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
 
-import {MockBridge} from "../src/mocks/MockBridge.sol";
-
 contract TaskTest is Script {
     address public admin;
     address public relayer;
     address public goatBridge;
+    address public bitcoin;
 
     function setUp() public virtual {
         admin = vm.envAddress("ADMIN_ADDR");
         relayer = vm.envAddress("RELAYER_ADDR");
+        bitcoin = vm.envAddress("BITCOIN_CONTRACT");
         goatBridge = vm.envAddress("GOAT_BRIDGE_CONTRACT");
     }
 
@@ -23,6 +23,7 @@ contract TaskTest is Script {
 
         // deploy contracts
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
+            bitcoin,
             goatBridge
         );
 

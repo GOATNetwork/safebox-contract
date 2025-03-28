@@ -6,11 +6,10 @@ import {console} from "forge-std/console.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
 
-import {MockBridge} from "../src/mocks/MockBridge.sol";
+import {MockBridge, MockBitcoin} from "../src/mocks/MockContracts.sol";
 
 contract TaskTest is Test {
     TaskManagerUpgradeable public taskManager;
-    MockBridge public mockBridge;
 
     address public msgSender;
     address public admin = address(1);
@@ -21,8 +20,12 @@ contract TaskTest is Test {
         msgSender = address(this);
 
         // deploy contracts
-        mockBridge = new MockBridge();
-        taskManager = new TaskManagerUpgradeable(address(mockBridge));
+        MockBitcoin mockBitcoin = new MockBitcoin();
+        MockBridge mockBridge = new MockBridge();
+        taskManager = new TaskManagerUpgradeable(
+            address(mockBitcoin),
+            address(mockBridge)
+        );
 
         // initialize task manager
         taskManager.initialize();
@@ -48,28 +51,17 @@ contract TaskTest is Test {
             "btcAddress"
         );
         uint256 taskId = 0;
-        (
-            uint256 partnerId,
-            address depositAddress,
-            uint8 state,
-            uint32 timelockEndTime,
-            uint32 deadline,
-            uint128 amount,
-            uint32 txOut,
-            bytes32 fundingTxHash,
-            bytes32 timelockTxHash,
-            bytes32 witnessScript,
-            string memory btcAddress
-        ) = taskManager.tasks(taskId);
-        assertEq(partnerId, newPartnerId);
-        assertEq(depositAddress, safeAddress);
-        assertEq(state, 1);
-        assertEq(timelockEndTime, block.timestamp + 90 days);
-        assertEq(deadline, block.timestamp + 1 days);
-        assertEq(amount, 1 ether);
-        assertEq(btcAddress, "btcAddress");
-        assertEq(taskManager.partnerTasks(partnerId, 0), taskId);
-        assertEq(taskManager.getPartnerTasks(partnerId).length, 1);
+
+        TaskManagerUpgradeable.Task memory task = taskManager.getTask(taskId);
+        assertEq(task.partnerId, newPartnerId);
+        assertEq(task.depositAddress, safeAddress);
+        assertEq(task.state, 1);
+        assertEq(task.timelockEndTime, block.timestamp + 90 days);
+        assertEq(task.deadline, block.timestamp + 1 days);
+        assertEq(task.amount, 1 ether);
+        assertEq(task.btcAddress, "btcAddress");
+        assertEq(taskManager.partnerTasks(newPartnerId, 0), taskId);
+        assertEq(taskManager.getPartnerTasks(newPartnerId).length, 1);
 
         // Send funds to the partner contract
         // @dev using call remove gas limitation
@@ -78,32 +70,29 @@ contract TaskTest is Test {
 
         // receive funds
         vm.prank(relayer);
-        taskManager.receiveFunds(
-            1 ether,
-            0,
-            "Funding Tx Hash",
-            1234,
+        taskManager.receiveFunds(taskId, 1 ether, "Funding Tx Hash", 1234);
+
+        bytes32[7] memory witnessScriptArray;
+        vm.prank(relayer);
+        taskManager.initTimelockTx(
+            taskId,
             "Timelock Tx Hash",
-            "Witness Script"
+            4321,
+            witnessScriptArray
         );
-        (
-            partnerId,
-            depositAddress,
-            state,
-            timelockEndTime,
-            deadline,
-            amount,
-            txOut,
-            fundingTxHash,
-            timelockTxHash,
-            witnessScript,
-            btcAddress
-        ) = taskManager.tasks(taskId);
-        assertEq(state, 2);
-        assertEq(txOut, 1234);
-        assertEq(fundingTxHash, "Funding Tx Hash");
-        assertEq(timelockTxHash, "Timelock Tx Hash");
-        assertEq(witnessScript, "Witness Script");
+        task = taskManager.getTask(taskId);
+        assertEq(task.state, 3);
+        assertEq(task.fundingTxOut, 1234);
+        assertEq(task.fundingTxHash, "Funding Tx Hash");
+        assertEq(task.timelockTxOut, 4321);
+        assertEq(task.timelockTxHash, "Timelock Tx Hash");
+
+        // failed to burn due to invalid state
+        vm.expectRevert("Invalid state");
+        taskManager.burn(taskId);
+
+        vm.prank(relayer);
+        taskManager.processTimelockTx(taskId);
 
         // failed to burn due to time not reached
         vm.expectRevert("Time not reached");
