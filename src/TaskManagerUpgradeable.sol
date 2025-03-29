@@ -57,6 +57,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Array of tasks
     Task[] public tasks;
     mapping(uint256 partnerId => uint256[]) public partnerTasks;
+    mapping(address depositAddress => uint256) public hasPendingTask;
 
     // Constructor to initialize immutable variables
     constructor(address _bitcoin, address _bridge) {
@@ -96,6 +97,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         require(_deadline > block.timestamp, "Invalid deadline");
         require(_amount > 0, "Invalid amount");
         require(_btcAddress[0] != 0, "Invalid btc address");
+        require(
+            hasPendingTask[_depositAddress] == 1 ||
+                hasPendingTask[_depositAddress] == 0,
+            "Task already exists"
+        );
+        hasPendingTask[_depositAddress] = 2;
         uint256 taskId = tasks.length;
         tasks.push(
             Task({
@@ -142,20 +149,27 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
+        hasPendingTask[_depositAddress] = 1;
         tasks[_taskId].state = 2; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;
         emit FundsReceived(_taskId, _fundingTxHash, _txOut);
     }
 
+    /**
+     * @dev Initialize Timelock tx for the funds
+     */
     function initTimelockTx(
         uint256 _taskId,
         bytes32 _timelockTxHash,
         uint32 _txOut,
         bytes32[7] calldata _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
-        require(tasks[_taskId].state == 2, "Invalid task");
-        tasks[_taskId].state = 3; // Task state is set to 'received'
+        require(
+            tasks[_taskId].state == 2 || tasks[_taskId].state == 3,
+            "Invalid task state"
+        );
+        tasks[_taskId].state = 3; // Task state is set to 'init timelock'
         tasks[_taskId].timelockTxHash = _timelockTxHash;
         tasks[_taskId].timelockTxOut = _txOut;
         tasks[_taskId].witnessScript = _witnessScript;
@@ -167,6 +181,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         );
     }
 
+    /**
+     * @dev Verify the timelock tx for the funds using SPV.
+     */
     function processTimelockTx(
         uint256 _taskId,
         uint256 height,
@@ -190,7 +207,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      * @dev Burn a task after its staking period has ended.
      * Only callable if the task is in the 'received' state.
      */
-    function burn(uint256 _taskId) public {
+    function burn(uint256 _taskId) public payable {
         require(tasks[_taskId].state == 4, "Invalid state");
         require(
             block.timestamp >= tasks[_taskId].timelockEndTime,
@@ -205,15 +222,16 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      * @dev Forcefully burn a task.
      * Only callable by accounts with the ADMIN_ROLE.
      */
-    function forceBurn(uint256 _taskId) public onlyRole(ADMIN_ROLE) {
+    function forceBurn(uint256 _taskId) public payable onlyRole(ADMIN_ROLE) {
         require(tasks[_taskId].state == 4, "Invalid state");
         tasks[_taskId].state = 5; // Task state is set to 'completed'
         payable(address(0)).transfer(tasks[_taskId].amount);
         emit Burned(_taskId);
     }
 
-    receive() external payable {}
-
+    /**
+     * @dev Verify a merkle proof of Bitcoin SPV.
+     */
     function verifyMerkleProof(
         bytes32 root,
         bytes32[] memory proof,
@@ -234,6 +252,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         return computedHash == root;
     }
 
+    /**
+     * @dev Double SHA256 hash of two inputs.
+     */
     function _doubleSha256Pair(
         bytes32 txA,
         bytes32 txB
@@ -244,4 +265,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         // do sha256 once again
         return sha256(abi.encodePacked(hash));
     }
+
+    receive() external payable {}
 }
