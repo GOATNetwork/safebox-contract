@@ -15,10 +15,9 @@ import {IBridge} from "./interfaces/IBridge.sol";
 contract TaskManagerUpgradeable is AccessControlUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    // Events for logging important actions
-    event PartnerCreated(uint256 partnerId);
-    event PartnerRemoved(uint256 partnerId);
+    // Events
     event TaskCreated(uint256 taskId);
+    event TaskCancelled(uint256 taskId);
     event FundsReceived(uint256 taskId, bytes32 fundingTxHash, uint32 txOut);
     event TimelockInitialized(
         uint256 taskId,
@@ -33,7 +32,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     struct Task {
         uint256 partnerId; // Address of the associated partner
         address depositAddress; // Address where the funds are deposited
-        uint8 state; // Task state: 0 (default), 1 (created), 2 (received), 3, (init timelock), 4(confirmed) 5 (completed)
+        uint8 state; // Task state: 0 (default/cancelled), 1 (created), 2 (received), 3, (init timelock), 4(confirmed) 5 (completed)
         uint32 timelockEndTime; // Timestamp when the timelock of the funds expires
         uint32 deadline; // Timestamp when the task is considered expired
         uint128 amount; // Amount of funds associated with the task
@@ -132,6 +131,13 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         emit TaskCreated(taskId);
     }
 
+    function cancelTask(uint256 _taskId) public onlyRole(ADMIN_ROLE) {
+        require(tasks[_taskId].state == 1, "Invalid task");
+        hasPendingTask[tasks[_taskId].depositAddress] = 1;
+        delete tasks[_taskId];
+        emit TaskCancelled(_taskId);
+    }
+
     /**
      * @dev Mark a task as received when funds are received.
      * Only callable by accounts with the RELAYER_ROLE.
@@ -149,7 +155,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
-        hasPendingTask[_depositAddress] = 1;
+        hasPendingTask[tasks[_taskId].depositAddress] = 1;
         tasks[_taskId].state = 2; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;

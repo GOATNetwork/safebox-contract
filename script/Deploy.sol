@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 import {Script, console} from "forge-std/Script.sol";
 
 import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
+import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
 
 contract TaskTest is Script {
     address public admin;
@@ -19,6 +20,7 @@ contract TaskTest is Script {
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.createWallet(deployerPrivateKey).addr;
         vm.startBroadcast(deployerPrivateKey);
 
         // deploy contracts
@@ -26,9 +28,14 @@ contract TaskTest is Script {
             bitcoin,
             goatBridge
         );
+        UpgradeableProxy proxy = new UpgradeableProxy(
+            address(taskManager),
+            deployer,
+            abi.encodeWithSelector(TaskManagerUpgradeable.initialize.selector)
+        );
+        taskManager = TaskManagerUpgradeable(payable(proxy));
 
         // initialize task manager
-        taskManager.initialize();
         taskManager.grantRole(taskManager.ADMIN_ROLE(), admin);
         taskManager.grantRole(taskManager.RELAYER_ROLE(), relayer);
 
