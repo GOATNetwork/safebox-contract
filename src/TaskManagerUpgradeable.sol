@@ -42,7 +42,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         bytes32 fundingTxHash; // Tx hash of the btc tx
         bytes32 timelockTxHash; // Tx hash of the btc timelock
         bytes32[7] witnessScript; // witnessScript of the btc timelock
-        bytes32 btcAddress; // Bitcoin address associated with the task
+        bytes32[2] btcAddress; // Bitcoin address associated with the task
     }
 
     // Role identifiers for access control
@@ -90,12 +90,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         uint32 _timelockEndTime,
         uint32 _deadline,
         uint128 _amount,
-        bytes32 _btcAddress
+        bytes32[2] calldata _btcAddress
     ) public onlyRole(ADMIN_ROLE) {
         require(_timelockEndTime > block.timestamp, "Invalid timelock");
         require(_deadline > block.timestamp, "Invalid deadline");
         require(_amount > 0, "Invalid amount");
-        require(_btcAddress != 0, "Invalid btc address");
+        require(_btcAddress[0] != 0, "Invalid btc address");
         uint256 taskId = tasks.length;
         tasks.push(
             Task({
