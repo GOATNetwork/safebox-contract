@@ -20,6 +20,7 @@ remappings = [
 ]
 
 [rpc_endpoints]
+localhost = "http://127.0.0.1:8545"
 bscMainnet = "${RPC_URL_BSC_MAINNET}"
 bscTestnet = "${BSC_TESTNET_RPC_URL}"
 goatMainnet = "https://rpc.goat.network"
