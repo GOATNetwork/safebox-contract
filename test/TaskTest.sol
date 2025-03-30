@@ -46,13 +46,19 @@ contract TaskTest is Test {
             bytes32("btcAddress0"),
             bytes32("btcAddress1")
         ];
+
+        bytes32[2] memory btcPubKey = [
+            bytes32("btcPubKey0"),
+            bytes32("btcPubKey1")
+        ];
         taskManager.setupTask(
             newPartnerId,
             safeAddress,
             uint32(block.timestamp + 90 days),
             uint32(block.timestamp + 1 days),
             1 ether,
-            btcAddress
+            btcAddress,
+            btcPubKey
         );
         uint256 taskId = 0;
 
@@ -64,6 +70,7 @@ contract TaskTest is Test {
         assertEq(task.deadline, block.timestamp + 1 days);
         assertEq(task.amount, 1 ether);
         assertEq(task.btcAddress[0], "btcAddress0");
+        assertEq(task.btcPubKey[0], "btcPubKey0");
         assertEq(taskManager.partnerTasks(newPartnerId, 0), taskId);
         assertEq(taskManager.getPartnerTasks(newPartnerId).length, 1);
 

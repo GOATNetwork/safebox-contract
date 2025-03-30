@@ -23,6 +23,13 @@ contract TaskTest is Script {
         address deployer = vm.createWallet(deployerPrivateKey).addr;
         vm.startBroadcast(deployerPrivateKey);
 
+        deployFull(deployer);
+        // deployLogic();
+
+        vm.stopBroadcast();
+    }
+
+    function deployFull(address _proxyAdmin) public {
         // deploy contracts
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
             bitcoin,
@@ -30,12 +37,12 @@ contract TaskTest is Script {
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(taskManager),
-            deployer,
+            _proxyAdmin,
             abi.encodeWithSelector(TaskManagerUpgradeable.initialize.selector)
         );
         taskManager = TaskManagerUpgradeable(payable(proxy));
 
-        // initialize task manager
+        // grant roles
         taskManager.grantRole(taskManager.ADMIN_ROLE(), admin);
         taskManager.grantRole(taskManager.RELAYER_ROLE(), relayer);
 
@@ -43,7 +50,16 @@ contract TaskTest is Script {
             "TaskManagerUpgradeable contract address: ",
             address(taskManager)
         );
+    }
 
-        vm.stopBroadcast();
+    function deployLogic() public {
+        TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
+            bitcoin,
+            goatBridge
+        );
+        console.log(
+            "TaskManagerUpgradeable logic address: ",
+            address(taskManager)
+        );
     }
 }
