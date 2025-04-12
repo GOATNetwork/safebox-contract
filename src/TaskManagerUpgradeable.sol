@@ -57,7 +57,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Array of tasks
     Task[] public tasks;
     mapping(uint256 partnerId => uint256[]) public partnerTasks;
-    mapping(address depositAddress => uint256) public hasPendingTask;
+    mapping(address depositAddress => uint256) public hasPendingTask; // 0/1: available, 2: not available
 
     // Constructor to initialize immutable variables
     constructor(address _bitcoin, address _bridge) {
@@ -96,7 +96,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     ) public onlyRole(ADMIN_ROLE) {
         require(_deadline > block.timestamp, "Invalid deadline");
         require(_timelockEndTime > _deadline, "Invalid timelock");
-        require(_amount > 0, "Invalid amount");
+        require(_amount > 0 && (_amount % 10 ** 12) == 0, "Invalid amount");
         require(_btcAddress[0] != 0, "Invalid btc address");
         require(_btcPubKey[0] != 0, "Invalid btc address");
         require(
@@ -135,6 +135,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         emit TaskCreated(taskId);
     }
 
+    /**
+     * @dev Cancel a task.
+     */
     function cancelTask(uint256 _taskId) public onlyRole(ADMIN_ROLE) {
         require(tasks[_taskId].state == 1, "Invalid task");
         hasPendingTask[tasks[_taskId].depositAddress] = 1;
@@ -159,7 +162,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
-        hasPendingTask[tasks[_taskId].depositAddress] = 1;
         tasks[_taskId].state = 2; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;
@@ -209,6 +211,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             ),
             "Invalid proof"
         );
+        hasPendingTask[tasks[_taskId].depositAddress] = 1;
         tasks[_taskId].state = 4; // Task state is set to 'confirmed'
         emit TimelockProcessed(_taskId);
     }
