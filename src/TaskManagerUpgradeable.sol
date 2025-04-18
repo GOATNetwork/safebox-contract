@@ -15,6 +15,9 @@ import {IBridge} from "./interfaces/IBridge.sol";
 contract TaskManagerUpgradeable is AccessControlUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    // Constants
+    uint256 public constant MIN_DEPOSIT_AMOUNT = 5 * 10 ** 14; // Minimum deposit amount in satoshis
+
     // Events
     event TaskCreated(uint256 taskId);
     event TaskCancelled(uint256 taskId);
@@ -49,8 +52,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
 
-    // Immutable addresses for partner beacon and bridge
-    address public immutable partnerBeacon;
     address public immutable bridge;
     address public immutable bitcoin;
 
@@ -96,7 +97,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     ) public onlyRole(ADMIN_ROLE) {
         require(_deadline > block.timestamp, "Invalid deadline");
         require(_timelockEndTime > _deadline, "Invalid timelock");
-        require(_amount > 0 && (_amount % 10 ** 12) == 0, "Invalid amount");
+        require(
+            _amount > MIN_DEPOSIT_AMOUNT && (_amount % 10 ** 12) == 0,
+            "Invalid amount"
+        );
         require(_btcAddress[0] != 0, "Invalid btc address");
         require(_btcPubKey[0] != 0, "Invalid btc address");
         require(
