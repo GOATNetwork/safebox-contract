@@ -42,15 +42,10 @@ contract TaskTest is Test {
     function test_StandardProcess() public {
         vm.prank(admin);
         uint256 newPartnerId = 10;
-        bytes32[2] memory btcAddress = [
-            bytes32("btcAddress0"),
-            bytes32("btcAddress1")
-        ];
-
-        bytes32[2] memory btcPubKey = [
-            bytes32("btcPubKey0"),
-            bytes32("btcPubKey1")
-        ];
+        bytes
+            memory btcAddress = hex"7462317165306b39743278306632367478723470373374303275617737716e637333343876637430656b";
+        bytes
+            memory btcPubKey = hex"038bc0a6e6b046ffdbd84aee9aea83d177c9f26f66d5f373949a78f6e774ca7f11";
         taskManager.setupTask(
             newPartnerId,
             safeAddress,
@@ -69,8 +64,14 @@ contract TaskTest is Test {
         assertEq(task.timelockEndTime, block.timestamp + 90 days);
         assertEq(task.deadline, block.timestamp + 1 days);
         assertEq(task.amount, 1 ether);
-        assertEq(task.btcAddress[0], "btcAddress0");
-        assertEq(task.btcPubKey[0], "btcPubKey0");
+        assertEq(
+            task.btcAddress[0],
+            0x7462317165306b39743278306632367478723470373374303275617737716e63
+        );
+        assertEq(
+            task.btcPubKey[0],
+            0x038bc0a6e6b046ffdbd84aee9aea83d177c9f26f66d5f373949a78f6e774ca7f
+        );
         assertEq(taskManager.partnerTasks(newPartnerId, 0), taskId);
         assertEq(taskManager.getPartnerTasks(newPartnerId).length, 1);
 
@@ -84,26 +85,33 @@ contract TaskTest is Test {
         taskManager.receiveFunds(taskId, 1 ether, "Funding Tx Hash", 1234);
 
         bytes32[7] memory witnessScriptArray;
+        bytes
+            memory txData = hex"0100000001ec2f8cd24340271826b88b342f12aea3752b6f6eca2c0214c89e25089acae3bc000000000001ffffff0200e1f505000000002200205edd35692a52d352e252bb38618faef733cf24bd5525774e906d6c7160724623d684010000000000160014237cc8e0fd3afb6bec89eeed15c28b15d33a6f5f00000000";
         vm.prank(relayer);
-        taskManager.initTimelockTx(
-            taskId,
-            "Timelock Tx Hash",
-            4321,
-            witnessScriptArray
-        );
+        taskManager.initTimelockTx(taskId, txData, 4321, witnessScriptArray);
         task = taskManager.getTask(taskId);
         assertEq(task.state, 3);
         assertEq(task.fundingTxOut, 1234);
         assertEq(task.fundingTxHash, "Funding Tx Hash");
         assertEq(task.timelockTxOut, 4321);
-        assertEq(task.timelockTxHash, "Timelock Tx Hash");
+        assertEq(
+            task.timelockTxHash,
+            0x20bb8ba38319e7d8f0e564962a8145a6e462f71292dac07a5564f3d4d0014ecf
+        );
 
         // failed to burn due to invalid state
         vm.expectRevert("Invalid state");
         taskManager.burn(taskId);
 
         // vm.prank(relayer);
-        // taskManager.processTimelockTx(taskId);
+        // bytes32[] memory proof = new bytes32[](2);
+        // proof[
+        //     0
+        // ] = 0x43a434c639ab3884361f168870b658d331e8dbc9dfbf05af093ee07c20ab766f;
+        // proof[
+        //     1
+        // ] = 0xf5d02b376037aa1b24f911ddac2347508b81dd97b1037a0fe25e4a3ff1b2e21d;
+        // taskManager.processTimelockTx(taskId, 0, proof, 0);
 
         // // failed to burn due to time not reached
         // vm.expectRevert("Time not reached");

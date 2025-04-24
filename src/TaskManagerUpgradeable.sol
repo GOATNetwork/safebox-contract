@@ -7,6 +7,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 
 import {IBitcoin} from "./interfaces/IBitcoin.sol";
 import {IBridge} from "./interfaces/IBridge.sol";
+import {BtcParser} from "./BtcParser.sol";
 
 /**
  * @title TaskManagerUpgradeable
@@ -14,6 +15,7 @@ import {IBridge} from "./interfaces/IBridge.sol";
  */
 contract TaskManagerUpgradeable is AccessControlUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using BtcParser for bytes;
 
     // Constants
     uint256 public constant AVAILABLE_TASK_STATE = type(uint256).max;
@@ -85,7 +87,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     /**
      * @dev Set up a new task for a partner.
-     * Only callable by accounts with the ADMIN_ROLE.
+     * Only P2WPKH addresses are supported.
      */
     function setupTask(
         uint256 _partnerId,
@@ -93,8 +95,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         uint32 _timelockEndTime,
         uint32 _deadline,
         uint128 _amount,
-        bytes32[2] calldata _btcAddress,
-        bytes32[2] calldata _btcPubKey
+        bytes calldata _btcAddress,
+        bytes calldata _btcPubKey
     ) public onlyRole(ADMIN_ROLE) {
         require(_deadline > block.timestamp, "Invalid deadline");
         require(_timelockEndTime > _deadline, "Invalid timelock");
@@ -102,14 +104,18 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             _amount > MIN_DEPOSIT_AMOUNT && (_amount % 10 ** 12) == 0,
             "Invalid amount"
         );
-        require(_btcAddress[0] != 0, "Invalid btc address");
-        require(_btcPubKey[0] != 0, "Invalid btc address");
-
         require(
             hasPendingTask[_depositAddress] == AVAILABLE_TASK_STATE ||
                 hasPendingTask[_depositAddress] == 0,
             "Task already exists"
         );
+
+        require(
+            keccak256(_btcPubKey.pubKeyToP2WPKH(false)) ==
+                keccak256(_btcAddress),
+            "Invalid btc address"
+        );
+
         uint256 taskId = tasks.length;
         hasPendingTask[_depositAddress] = taskId;
         tasks.push(
@@ -133,8 +139,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                     bytes32(0),
                     bytes32(0)
                 ],
-                btcAddress: _btcAddress,
-                btcPubKey: _btcPubKey
+                btcAddress: _btcAddress.bytesToBytes2(),
+                btcPubKey: _btcPubKey.bytesToBytes2()
             })
         );
         partnerTasks[_partnerId].push(taskId);
