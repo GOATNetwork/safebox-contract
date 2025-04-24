@@ -16,6 +16,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // Constants
+    uint256 public constant AVAILABLE_TASK_STATE = type(uint256).max;
     uint256 public constant MIN_DEPOSIT_AMOUNT = 5 * 10 ** 14; // Minimum deposit amount in satoshis
 
     // Events
@@ -103,13 +104,14 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         );
         require(_btcAddress[0] != 0, "Invalid btc address");
         require(_btcPubKey[0] != 0, "Invalid btc address");
+
         require(
-            hasPendingTask[_depositAddress] == 1 ||
+            hasPendingTask[_depositAddress] == AVAILABLE_TASK_STATE ||
                 hasPendingTask[_depositAddress] == 0,
             "Task already exists"
         );
-        hasPendingTask[_depositAddress] = 2;
         uint256 taskId = tasks.length;
+        hasPendingTask[_depositAddress] = taskId;
         tasks.push(
             Task({
                 partnerId: _partnerId,
@@ -144,7 +146,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function cancelTask(uint256 _taskId) public onlyRole(ADMIN_ROLE) {
         require(tasks[_taskId].state == 1, "Invalid task");
-        hasPendingTask[tasks[_taskId].depositAddress] = 1;
+        hasPendingTask[tasks[_taskId].depositAddress] = AVAILABLE_TASK_STATE;
         delete tasks[_taskId];
         emit TaskCancelled(_taskId);
     }
@@ -215,7 +217,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             ),
             "Invalid proof"
         );
-        hasPendingTask[tasks[_taskId].depositAddress] = 1;
+        hasPendingTask[tasks[_taskId].depositAddress] = AVAILABLE_TASK_STATE;
         tasks[_taskId].state = 4; // Task state is set to 'confirmed'
         emit TimelockProcessed(_taskId);
     }
