@@ -179,7 +179,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function initTimelockTx(
         uint256 _taskId,
-        bytes32 _timelockTxHash,
+        bytes memory _txData,
         uint32 _txOut,
         bytes32[7] calldata _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
@@ -187,13 +187,14 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             tasks[_taskId].state == 2 || tasks[_taskId].state == 3,
             "Invalid task state"
         );
+        bytes32 timelockTxHash = _doubleSha256Bytes(_txData);
         tasks[_taskId].state = 3; // Task state is set to 'init timelock'
-        tasks[_taskId].timelockTxHash = _timelockTxHash;
+        tasks[_taskId].timelockTxHash = timelockTxHash;
         tasks[_taskId].timelockTxOut = _txOut;
         tasks[_taskId].witnessScript = _witnessScript;
         emit TimelockInitialized(
             _taskId,
-            _timelockTxHash,
+            timelockTxHash,
             _txOut,
             _witnessScript
         );
@@ -283,6 +284,39 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
         // do sha256 once again
         return sha256(abi.encodePacked(hash));
+    }
+
+    /**
+     * @dev Calculate BTC tx hash from raw tx data.
+     */
+    function _doubleSha256Bytes(
+        bytes memory _data
+    ) public pure returns (bytes32) {
+        // Compute double SHA256
+        bytes32 first = sha256(_data);
+        bytes32 hash = sha256(abi.encodePacked(first));
+
+        // Reverse bytes using assembly
+        bytes32 reversed;
+        assembly {
+            // Load hash into memory
+            let h := hash
+            // Reverse bytes by shifting and masking
+            let r := 0
+            for {
+                let i := 0
+            } lt(i, 32) {
+                i := add(i, 1)
+            } {
+                // Extract byte i from hash and place it at position 31-i
+                let b := and(shr(mul(sub(31, i), 8), h), 0xff)
+                // Shift and add to reversed
+                r := or(shl(mul(i, 8), b), r)
+            }
+            reversed := r
+        }
+
+        return reversed;
     }
 
     receive() external payable {}
