@@ -5,6 +5,7 @@ import {console} from "forge-std/console.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
+import {BTCStyleMerkle} from "../src/libraries/BTCStyleMerkle.sol";
 
 import {MockBridge, MockBitcoin} from "../src/mocks/MockContracts.sol";
 
@@ -55,7 +56,7 @@ contract TaskTest is Test {
             btcAddress,
             btcPubKey
         );
-        uint256 taskId = 0;
+        uint256 taskId = 1;
 
         TaskManagerUpgradeable.Task memory task = taskManager.getTask(taskId);
         assertEq(task.partnerId, newPartnerId);
@@ -102,6 +103,27 @@ contract TaskTest is Test {
         // failed to burn due to invalid state
         vm.expectRevert("Invalid state");
         taskManager.burn(taskId);
+
+        bytes32[] memory blockHashes = new bytes32[](3);
+        // block 125 in regtest
+        blockHashes[0] = BTCStyleMerkle.reverseBytes32(
+            0x841ca96a59778c0d30e9a1cb70cb3329402de0ae1633e7c029cdd9874280a12c
+        );
+        // 126
+        blockHashes[1] = BTCStyleMerkle.reverseBytes32(
+            0x7689cc2cf531ca0d04ed4bf94348f87650a4a3385b4ff82de35416a809154887
+        );
+        // 127
+        blockHashes[2] = BTCStyleMerkle.reverseBytes32(
+            0xf3feb36a650888afc7006dfee0e30516e1564e301d49f773b853b1930d27b5df
+        );
+        (
+            bytes32[] memory blockMerkleProof,
+            bytes32 blockHashMerkleRoot
+        ) = BTCStyleMerkle.generateMerkleProof(blockHashes, 1);
+
+        bytes32 computedRoot = BTCStyleMerkle.computeMerkleRoot(blockHashes);
+        assertEq(computedRoot, blockHashMerkleRoot);
 
         // vm.prank(relayer);
         // bytes32[] memory proof = new bytes32[](2);

@@ -243,4 +243,13 @@ library BtcParser {
             mstore(add(compact, 32), mload(add(input, 64))) // next 32 bytes
         }
     }
+
+    function reverseBytes32(bytes32 input) public pure returns (bytes32) {
+        // convert to temporary bytes, reverse, then convert back to bytes32
+        bytes memory buf = new bytes(32);
+        for (uint256 i = 0; i < 32; i++) {
+            buf[i] = input[31 - i];
+        }
+        return bytes32(buf);
+    }
 }

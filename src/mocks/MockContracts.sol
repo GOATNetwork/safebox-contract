@@ -6,7 +6,8 @@ import {IBridge} from "../interfaces/IBridge.sol";
 
 contract MockBitcoin is IBitcoin {
     function blockHash(uint256) external view returns (bytes32) {
-        return bytes32(0);
+        return
+            0x7b51798b5df7f949a45ec16fa2160b6ef30d9870bfc6345bc9b4e1a4e22b986d;
     }
 }
 

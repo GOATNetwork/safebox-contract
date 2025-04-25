@@ -7,7 +7,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 
 import {IBitcoin} from "./interfaces/IBitcoin.sol";
 import {IBridge} from "./interfaces/IBridge.sol";
-import {BtcParser} from "./BtcParser.sol";
+import {BtcParser} from "./libraries/BtcParser.sol";
 
 /**
  * @title TaskManagerUpgradeable
@@ -61,7 +61,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Array of tasks
     Task[] public tasks;
     mapping(uint256 partnerId => uint256[]) public partnerTasks;
-    mapping(address depositAddress => uint256) public hasPendingTask; // 0/1: available, 2: not available
+    mapping(address depositAddress => uint256) public hasPendingTask; // 0/AVAILABLE_TASK_STATE: available
 
     // Constructor to initialize immutable variables
     constructor(address _bitcoin, address _bridge) {
@@ -73,10 +73,11 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     function initialize() public initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        tasks.push();
     }
 
-    function getTask(uint256 _index) external view returns (Task memory) {
-        return tasks[_index];
+    function getTask(uint256 _taskId) external view returns (Task memory) {
+        return tasks[_taskId];
     }
 
     function getPartnerTasks(
