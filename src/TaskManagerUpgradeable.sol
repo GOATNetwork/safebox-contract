@@ -212,14 +212,14 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function processTimelockTx(
         uint256 _taskId,
-        uint256 height,
-        bytes32[] calldata proof,
+        bytes32 _merklrRoot,
+        bytes32[] calldata _proof,
         uint256 _index
     ) public onlyRole(RELAYER_ROLE) {
         require(
             verifyMerkleProof(
-                IBitcoin(bitcoin).blockHash(height),
-                proof,
+                _merklrRoot,
+                _proof,
                 tasks[_taskId].timelockTxHash,
                 _index
             ),
