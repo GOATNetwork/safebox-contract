@@ -213,6 +213,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         bytes32[] calldata _proof,
         uint256 _index
     ) public onlyRole(RELAYER_ROLE) {
+        require(tasks[_taskId].state == 3, "Invalid task");
         require(
             verifyMerkleProof(
                 _merklrRoot,
