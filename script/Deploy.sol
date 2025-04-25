@@ -9,12 +9,10 @@ contract TaskTest is Script {
     address public admin;
     address public relayer;
     address public goatBridge;
-    address public bitcoin;
 
     function setUp() public virtual {
         admin = vm.envAddress("ADMIN_ADDR");
         relayer = vm.envAddress("RELAYER_ADDR");
-        bitcoin = vm.envAddress("BITCOIN_CONTRACT");
         goatBridge = vm.envAddress("GOAT_BRIDGE_CONTRACT");
     }
 
@@ -32,7 +30,6 @@ contract TaskTest is Script {
     function deployFull(address _proxyAdmin) public {
         // deploy contracts
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
-            bitcoin,
             goatBridge
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
@@ -54,7 +51,6 @@ contract TaskTest is Script {
 
     function deployLogic() public {
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
-            bitcoin,
             goatBridge
         );
         console.log(

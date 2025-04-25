@@ -5,7 +5,6 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-import {IBitcoin} from "./interfaces/IBitcoin.sol";
 import {IBridge} from "./interfaces/IBridge.sol";
 import {BtcParser} from "./libraries/BtcParser.sol";
 
@@ -56,7 +55,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
 
     address public immutable bridge;
-    address public immutable bitcoin;
 
     // Array of tasks
     Task[] public tasks;
@@ -64,8 +62,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     mapping(address depositAddress => uint256) public hasPendingTask; // 0/AVAILABLE_TASK_STATE: available
 
     // Constructor to initialize immutable variables
-    constructor(address _bitcoin, address _bridge) {
-        bitcoin = _bitcoin;
+    constructor(address _bridge) {
         bridge = _bridge;
     }
 

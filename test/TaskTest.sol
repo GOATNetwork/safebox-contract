@@ -21,12 +21,8 @@ contract TaskTest is Test {
         msgSender = address(this);
 
         // deploy contracts
-        MockBitcoin mockBitcoin = new MockBitcoin();
         MockBridge mockBridge = new MockBridge();
-        taskManager = new TaskManagerUpgradeable(
-            address(mockBitcoin),
-            address(mockBridge)
-        );
+        taskManager = new TaskManagerUpgradeable(address(mockBridge));
 
         // initialize task manager
         taskManager.initialize();
