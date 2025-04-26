@@ -15,6 +15,15 @@ import {BtcParser} from "./libraries/BtcParser.sol";
 contract TaskManagerUpgradeable is AccessControlUpgradeable {
     using BtcParser for bytes;
 
+    enum TaskState {
+        None,
+        Created,
+        Received,
+        TimelockInitialized,
+        Confirmed,
+        Completed
+    }
+
     // Constants
     uint256 public constant AVAILABLE_TASK_STATE = type(uint256).max;
     uint256 public constant MIN_DEPOSIT_AMOUNT = 5 * 10 ** 14; // Minimum deposit amount in satoshis
@@ -36,7 +45,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     struct Task {
         uint256 partnerId; // Address of the associated partner
         address depositAddress; // Address where the funds are deposited
-        uint8 state; // Task state: 0 (default/cancelled), 1 (created), 2 (received), 3, (init timelock), 4(confirmed) 5 (completed)
+        TaskState state; // Task state: 0 (default/cancelled), 1 (created), 2 (received), 3, (init timelock), 4(confirmed) 5 (completed)
         uint32 timelockEndTime; // Timestamp when the timelock of the funds expires
         uint32 deadline; // Timestamp when the task is considered expired
         uint128 amount; // Amount of funds associated with the task
@@ -63,6 +72,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Constructor to initialize immutable variables
     constructor(address _bridge) {
         bridge = _bridge;
+        _disableInitializers();
     }
 
     // Initializer function for upgradeable contracts
@@ -120,7 +130,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             Task({
                 partnerId: _partnerId,
                 depositAddress: _depositAddress,
-                state: 1, // Task state is set to 'created'
+                state: TaskState.Created,
                 timelockEndTime: _timelockEndTime,
                 deadline: _deadline,
                 amount: _amount,
@@ -146,10 +156,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     }
 
     /**
-     * @dev Cancel a task.
+     * @dev Cancel a task before the funds is received.
      */
     function cancelTask(uint256 _taskId) public onlyRole(ADMIN_ROLE) {
-        require(tasks[_taskId].state == 1, "Invalid task");
+        require(tasks[_taskId].state == TaskState.Created, "Invalid task");
         hasPendingTask[tasks[_taskId].depositAddress] = AVAILABLE_TASK_STATE;
         delete tasks[_taskId];
         emit TaskCancelled(_taskId);
@@ -164,14 +174,14 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         bytes32 _fundingTxHash,
         uint32 _txOut
     ) public onlyRole(RELAYER_ROLE) {
-        require(tasks[_taskId].state == 1, "Invalid task");
+        require(tasks[_taskId].state == TaskState.Created, "Invalid task");
         require(block.timestamp <= tasks[_taskId].deadline, "Task expired");
         require(_amount == tasks[_taskId].amount, "Invalid amount");
         require(
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
-        tasks[_taskId].state = 2; // Task state is set to 'received'
+        tasks[_taskId].state = TaskState.Received; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;
         emit FundsReceived(_taskId, _fundingTxHash, _txOut);
@@ -187,11 +197,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         bytes32[7] calldata _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
         require(
-            tasks[_taskId].state == 2 || tasks[_taskId].state == 3,
+            tasks[_taskId].state == TaskState.Received ||
+                tasks[_taskId].state == TaskState.TimelockInitialized,
             "Invalid task state"
         );
         bytes32 timelockTxHash = _doubleSha256Bytes(_txData);
-        tasks[_taskId].state = 3; // Task state is set to 'init timelock'
+        tasks[_taskId].state = TaskState.TimelockInitialized; // Task state is set to 'init timelock'
         tasks[_taskId].timelockTxHash = timelockTxHash;
         tasks[_taskId].timelockTxOut = _txOut;
         tasks[_taskId].witnessScript = _witnessScript;
@@ -212,7 +223,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         bytes32[] calldata _proof,
         uint256 _index
     ) public onlyRole(RELAYER_ROLE) {
-        require(tasks[_taskId].state == 3, "Invalid task");
+        require(
+            tasks[_taskId].state == TaskState.TimelockInitialized,
+            "Invalid task"
+        );
         require(
             verifyMerkleProof(
                 _merklrRoot,
@@ -223,7 +237,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             "Invalid proof"
         );
         hasPendingTask[tasks[_taskId].depositAddress] = AVAILABLE_TASK_STATE;
-        tasks[_taskId].state = 4; // Task state is set to 'confirmed'
+        tasks[_taskId].state = TaskState.Confirmed; // Task state is set to 'confirmed'
         emit TimelockProcessed(_taskId);
     }
 
@@ -231,12 +245,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      * @dev Burn a task after its staking period has ended.
      */
     function burn(uint256 _taskId) public payable {
-        require(tasks[_taskId].state == 4, "Invalid state");
+        require(tasks[_taskId].state == TaskState.Confirmed, "Invalid state");
         require(
             block.timestamp >= tasks[_taskId].timelockEndTime,
             "Time not reached"
         );
-        tasks[_taskId].state = 5; // Task state is set to 'completed'
+        tasks[_taskId].state = TaskState.Completed; // Task state is set to 'completed'
         payable(address(0)).transfer(tasks[_taskId].amount);
         emit Burned(_taskId);
     }
@@ -246,8 +260,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      * Only callable by accounts with the ADMIN_ROLE.
      */
     function forceBurn(uint256 _taskId) public payable onlyRole(ADMIN_ROLE) {
-        require(tasks[_taskId].state == 4, "Invalid state");
-        tasks[_taskId].state = 5; // Task state is set to 'completed'
+        require(tasks[_taskId].state == TaskState.Confirmed, "Invalid state");
+        tasks[_taskId].state = TaskState.Completed; // Task state is set to 'completed'
         payable(address(0)).transfer(tasks[_taskId].amount);
         emit Burned(_taskId);
     }

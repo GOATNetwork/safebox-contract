@@ -3,11 +3,10 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
-import {BTCStyleMerkle} from "../src/libraries/BTCStyleMerkle.sol";
+import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
 
-import {MockBridge, MockBitcoin} from "../src/mocks/MockContracts.sol";
+import {MockBridge} from "../src/mocks/MockContracts.sol";
 
 contract TaskTest is Test {
     TaskManagerUpgradeable public taskManager;
@@ -23,9 +22,14 @@ contract TaskTest is Test {
         // deploy contracts
         MockBridge mockBridge = new MockBridge();
         taskManager = new TaskManagerUpgradeable(address(mockBridge));
+        UpgradeableProxy proxy = new UpgradeableProxy(
+            address(taskManager),
+            admin,
+            abi.encodeWithSelector(TaskManagerUpgradeable.initialize.selector)
+        );
+        taskManager = TaskManagerUpgradeable(payable(proxy));
 
         // initialize task manager
-        taskManager.initialize();
         assertTrue(
             taskManager.hasRole(taskManager.DEFAULT_ADMIN_ROLE(), msgSender)
         );
@@ -57,7 +61,7 @@ contract TaskTest is Test {
         TaskManagerUpgradeable.Task memory task = taskManager.getTask(taskId);
         assertEq(task.partnerId, newPartnerId);
         assertEq(task.depositAddress, safeAddress);
-        assertEq(task.state, 1);
+        assertEq(uint8(task.state), 1);
         assertEq(task.timelockEndTime, block.timestamp + 90 days);
         assertEq(task.deadline, block.timestamp + 1 days);
         assertEq(task.amount, 1 ether);
@@ -83,71 +87,79 @@ contract TaskTest is Test {
 
         bytes32[7] memory witnessScriptArray;
         bytes
-            memory txData = hex"0100000001ec2f8cd24340271826b88b342f12aea3752b6f6eca2c0214c89e25089acae3bc000000000001ffffff0200e1f505000000002200205edd35692a52d352e252bb38618faef733cf24bd5525774e906d6c7160724623d684010000000000160014237cc8e0fd3afb6bec89eeed15c28b15d33a6f5f00000000";
+            memory txData = hex"0100000002e907a52bebbb81806b0563d04a7ad631176d4582e62cf85448c8fa023688dc30000000000001ffffff36432a6b40d125d901c7b4a1a86436d8e19c62cb8db069fde991e2c74b610e1a010000000001ffffff0238c70000000000002200208359f2b3fdbf85311b02ee3d017547cafd09bee979012363bfd5e7d242a85eded9aec50400000000160014fc456386689dfe8e94dfcfae8a0b953eb91d140b00000000";
         vm.prank(relayer);
         taskManager.initTimelockTx(taskId, txData, 4321, witnessScriptArray);
         task = taskManager.getTask(taskId);
-        assertEq(task.state, 3);
+        assertEq(uint8(task.state), 3);
         assertEq(task.fundingTxOut, 1234);
         assertEq(task.fundingTxHash, "Funding Tx Hash");
         assertEq(task.timelockTxOut, 4321);
         assertEq(
             task.timelockTxHash,
-            0x20bb8ba38319e7d8f0e564962a8145a6e462f71292dac07a5564f3d4d0014ecf
+            0xadcf472b310848a41272aa3d72f5b04aec42867549e80e3b60712722a296ce0f
         );
 
         // failed to burn due to invalid state
         vm.expectRevert("Invalid state");
         taskManager.burn(taskId);
 
-        bytes32[] memory blockHashes = new bytes32[](3);
-        // block 125 in regtest
-        blockHashes[0] = BTCStyleMerkle.reverseBytes32(
-            0x841ca96a59778c0d30e9a1cb70cb3329402de0ae1633e7c029cdd9874280a12c
-        );
-        // 126
-        blockHashes[1] = BTCStyleMerkle.reverseBytes32(
-            0x7689cc2cf531ca0d04ed4bf94348f87650a4a3385b4ff82de35416a809154887
-        );
-        // 127
-        blockHashes[2] = BTCStyleMerkle.reverseBytes32(
-            0xf3feb36a650888afc7006dfee0e30516e1564e301d49f773b853b1930d27b5df
-        );
-        (
-            bytes32[] memory blockMerkleProof,
-            bytes32 blockHashMerkleRoot
-        ) = BTCStyleMerkle.generateMerkleProof(blockHashes, 1);
+        vm.prank(relayer);
+        bytes32 merkleRoot = 0x39dc554a21dace16b0b94295f45d64b3dba1e8a717504b467939c8c5cd2052e9;
+        bytes32[] memory proof = new bytes32[](11);
+        proof[
+            0
+        ] = 0xaec693ed07aa507d71728090ebedeb0e25d51351f495c35278c25be542718022;
+        proof[
+            1
+        ] = 0x47efe1e96eb55de81ceb6256c0675f6988e793a970faf02ee916fb57fedf81c0;
+        proof[
+            2
+        ] = 0x38304f8be20ffae66b97e9a904ff55eba372a6ca24dd9df466a6148a59b45eaf;
+        proof[
+            3
+        ] = 0x454e4146b8041226f7eef6627de9db93a1b3e549ab55f147ebe416232fb4137b;
+        proof[
+            4
+        ] = 0x9fbfda72c6d95f5f1597c19dd025475dd2a6f6c5bfaba0b46e009d0be3ebcc93;
+        proof[
+            5
+        ] = 0xdaa1bd6551356d04cd836d1f76519b785b85493dcd42985ad85afaea6ed67f9b;
+        proof[
+            6
+        ] = 0x899091ff1eece7f2815b39003274dd9907f93fb2ddda52e072b3d065fc529ca4;
+        proof[
+            7
+        ] = 0x024679d9aa192a213c2395bda62eb41382440d2e5af5c7a01217212a950cb53d;
+        proof[
+            8
+        ] = 0x81786ec31574dd94fb56a722eb59d277f465b8ab2a22451d2ed67665d343e180;
+        proof[
+            9
+        ] = 0x110b4921fd1accdbe98a989cd3361726487463c8b6ab3cae580f7cd2c513d250;
+        proof[
+            10
+        ] = 0xe3455c6f045b2f486dbf553018bccaa95d95a2864c1ddf90011e59d0bd31dc44;
+        uint256 txIndex = 1386;
+        taskManager.processTimelockTx(taskId, merkleRoot, proof, txIndex);
 
-        bytes32 computedRoot = BTCStyleMerkle.computeMerkleRoot(blockHashes);
-        assertEq(computedRoot, blockHashMerkleRoot);
+        // failed to burn due to time not reached
+        vm.expectRevert("Time not reached");
+        taskManager.burn(taskId);
 
-        // vm.prank(relayer);
-        // bytes32[] memory proof = new bytes32[](2);
-        // proof[
-        //     0
-        // ] = 0x43a434c639ab3884361f168870b658d331e8dbc9dfbf05af093ee07c20ab766f;
-        // proof[
-        //     1
-        // ] = 0xf5d02b376037aa1b24f911ddac2347508b81dd97b1037a0fe25e4a3ff1b2e21d;
-        // taskManager.processTimelockTx(taskId, 0, proof, 0);
+        // skip time
+        skip(90 days);
 
-        // // failed to burn due to time not reached
-        // vm.expectRevert("Time not reached");
-        // taskManager.burn(taskId);
+        // burn failed due to insufficient balance
+        vm.expectRevert();
+        taskManager.burn(taskId);
 
-        // // skip time
-        // skip(90 days);
+        // return the funds
+        vm.prank(safeAddress);
+        address(taskManager).call{value: 1 ether}("");
 
-        // // burn failed due to insufficient balance
-        // vm.expectRevert();
-        // taskManager.burn(taskId);
-
-        // // return the funds
-        // vm.prank(safeAddress);
-        // address(taskManager).call{value: 1 ether}("");
-
-        // // burn funds
-        // taskManager.burn(taskId);
-        // assertEq(address(safeAddress).balance, 0);
+        // burn funds
+        taskManager.burn(taskId);
+        assertEq(address(safeAddress).balance, 0);
     }
 }
