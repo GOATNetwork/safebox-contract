@@ -13,7 +13,6 @@ import {BtcParser} from "./libraries/BtcParser.sol";
  * @dev Contract for managing tasks and partners.
  */
 contract TaskManagerUpgradeable is AccessControlUpgradeable {
-    using EnumerableSet for EnumerableSet.AddressSet;
     using BtcParser for bytes;
 
     // Constants
@@ -70,6 +69,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     function initialize() public initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        // push an empty task to avoid index 0
         tasks.push();
     }
 
@@ -107,7 +107,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                 hasPendingTask[_depositAddress] == 0,
             "Task already exists"
         );
-
+        // Check if the address is a valid P2WPKH address
         require(
             keccak256(_btcPubKey.pubKeyToP2WPKH(false)) ==
                 keccak256(_btcAddress),
@@ -157,7 +157,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     /**
      * @dev Mark a task as received when funds are received.
-     * Only callable by accounts with the RELAYER_ROLE.
      */
     function receiveFunds(
         uint256 _taskId,
@@ -230,7 +229,6 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     /**
      * @dev Burn a task after its staking period has ended.
-     * Only callable if the task is in the 'received' state.
      */
     function burn(uint256 _taskId) public payable {
         require(tasks[_taskId].state == 4, "Invalid state");
@@ -244,7 +242,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     }
 
     /**
-     * @dev Forcefully burn a task.
+     * @dev Forcefully burn a task before the timelock expires.
      * Only callable by accounts with the ADMIN_ROLE.
      */
     function forceBurn(uint256 _taskId) public payable onlyRole(ADMIN_ROLE) {
@@ -299,29 +297,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     ) public pure returns (bytes32) {
         // Compute double SHA256
         bytes32 first = sha256(_data);
-        bytes32 hash = sha256(abi.encodePacked(first));
-
-        // Reverse bytes using assembly
-        bytes32 reversed;
-        assembly {
-            // Load hash into memory
-            let h := hash
-            // Reverse bytes by shifting and masking
-            let r := 0
-            for {
-                let i := 0
-            } lt(i, 32) {
-                i := add(i, 1)
-            } {
-                // Extract byte i from hash and place it at position 31-i
-                let b := and(shr(mul(sub(31, i), 8), h), 0xff)
-                // Shift and add to reversed
-                r := or(shl(mul(i, 8), b), r)
-            }
-            reversed := r
-        }
-
-        return reversed;
+        return sha256(abi.encodePacked(first));
     }
 
     receive() external payable {}
