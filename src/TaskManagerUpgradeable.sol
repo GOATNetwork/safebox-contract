@@ -60,6 +60,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     // Role identifiers for access control
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    // @note The relayer is implemented using TSS (Threshold Signature Scheme), meaning
+    // submissions under this role come from different participants with off-chain consensus.
+    // This setup enhances security and makes the role significantly harder to compromise.
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
 
     address public immutable bridge;
