@@ -196,6 +196,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         uint32 _txOut,
         bytes32[7] calldata _witnessScript
     ) public onlyRole(RELAYER_ROLE) {
+        require(_txData.length > 64, "Invalid tx data");
         require(
             tasks[_taskId].state == TaskState.Received ||
                 tasks[_taskId].state == TaskState.TimelockInitialized,
