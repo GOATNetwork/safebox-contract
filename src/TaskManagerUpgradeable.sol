@@ -5,6 +5,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
+import {IBitcoin} from "./interfaces/IBitcoin.sol";
 import {IBridge} from "./interfaces/IBridge.sol";
 import {BtcParser} from "./libraries/BtcParser.sol";
 
@@ -65,6 +66,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // This setup enhances security and makes the role significantly harder to compromise.
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
 
+    address public immutable bitcoin;
     address public immutable bridge;
 
     // Array of tasks
@@ -73,7 +75,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     mapping(address depositAddress => uint256) public hasPendingTask; // 0/AVAILABLE_TASK_STATE: available
 
     // Constructor to initialize immutable variables
-    constructor(address _bridge) {
+    constructor(address _bitcoin, address _bridge) {
+        bitcoin = _bitcoin;
         bridge = _bridge;
         _disableInitializers();
     }
@@ -223,7 +226,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function processTimelockTx(
         uint256 _taskId,
-        bytes32 _merklrRoot,
+        bytes calldata _rawHeader,
+        uint256 _height,
         bytes32[] calldata _proof,
         uint256 _index
     ) public onlyRole(RELAYER_ROLE) {
@@ -231,9 +235,16 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             tasks[_taskId].state == TaskState.TimelockInitialized,
             "Invalid task"
         );
+        (bytes32 blockHash, bytes32 merkleRoot) = _parseBtcBlockHeader(
+            _rawHeader
+        );
+        require(
+            blockHash == IBitcoin(bitcoin).blockHash(_height),
+            "Invalid block hash"
+        );
         require(
             verifyMerkleProof(
-                _merklrRoot,
+                merkleRoot,
                 _proof,
                 tasks[_taskId].timelockTxHash,
                 _index
@@ -291,6 +302,15 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         }
 
         return computedHash == root;
+    }
+
+    function _parseBtcBlockHeader(
+        bytes calldata _rawHeader
+    ) public pure returns (bytes32 blockHash, bytes32 merkleRoot) {
+        blockHash = sha256(abi.encodePacked(sha256(_rawHeader)));
+        assembly {
+            merkleRoot := mload(add(_rawHeader.offset, 0x44))
+        }
     }
 
     /**
