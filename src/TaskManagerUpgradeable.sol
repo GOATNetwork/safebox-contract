@@ -306,10 +306,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     function _parseBtcBlockHeader(
         bytes calldata _rawHeader
-    ) public pure returns (bytes32 blockHash, bytes32 merkleRoot) {
-        blockHash = sha256(abi.encodePacked(sha256(_rawHeader)));
+    ) internal pure returns (bytes32 blockHash, bytes32 merkleRoot) {
+        blockHash = _doubleSha256Bytes(_rawHeader);
         assembly {
-            merkleRoot := mload(add(_rawHeader.offset, 0x44))
+            merkleRoot := calldataload(add(_rawHeader.offset, 0x24))
         }
     }
 
