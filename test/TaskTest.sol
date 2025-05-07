@@ -92,7 +92,7 @@ contract TaskTest is Test {
 
         bytes32[7] memory witnessScriptArray;
         bytes
-            memory txData = hex"0100000002e907a52bebbb81806b0563d04a7ad631176d4582e62cf85448c8fa023688dc30000000000001ffffff36432a6b40d125d901c7b4a1a86436d8e19c62cb8db069fde991e2c74b610e1a010000000001ffffff0238c70000000000002200208359f2b3fdbf85311b02ee3d017547cafd09bee979012363bfd5e7d242a85eded9aec50400000000160014fc456386689dfe8e94dfcfae8a0b953eb91d140b00000000";
+            memory txData = hex"010000000266701563d6a7a9111f09e7661a26bea81f8731ff89c9996f300349e78da4d560010000000001ffffff5d1afe8b0eae12602cc9470e23cc5f07a60cb744e81e8d574c32f432d542794d000000000001ffffff0260ea00000000000022002006c0dee822a6e9ea2e97ce4668ac4363679b4ba52b76566dc388f4278c2f423a800d280000000000160014fc456386689dfe8e94dfcfae8a0b953eb91d140b00000000";
         vm.prank(relayer);
         taskManager.initTimelockTx(taskId, txData, 4321, witnessScriptArray);
         task = taskManager.getTask(taskId);
@@ -102,7 +102,7 @@ contract TaskTest is Test {
         assertEq(task.timelockTxOut, 4321);
         assertEq(
             task.timelockTxHash,
-            0xadcf472b310848a41272aa3d72f5b04aec42867549e80e3b60712722a296ce0f
+            0x4f89a5ea25537300bc64896c155fd5bd1e34699a72a261253842d70a2e2110f2
         );
 
         // failed to burn due to invalid state
@@ -110,61 +110,74 @@ contract TaskTest is Test {
         taskManager.burn(taskId);
 
         vm.prank(relayer);
-        bytes32 merkleRoot = 0x39dc554a21dace16b0b94295f45d64b3dba1e8a717504b467939c8c5cd2052e9;
-        bytes32[] memory proof = new bytes32[](11);
+        // curl https://blockstream.info/testnet/api/block/0000000000d8286a670f353aa460dad943185a829e594b47a9f516f5ca10ed28
+        bytes
+            memory rawHeader = hex"00a0572211d2d2d76f7db99a71ef1a61f5bd3933942a1bc6b7536744ffc3080000000000cbb4f9ca6a2c050515ae008a94083a4a3d0eaeeed6c26318b7e7a25c7ca257f0fd371a68ffff001d7602e77e";
+        uint256 blockHeight = 4324887;
+        bytes32[] memory proof = new bytes32[](12);
         proof[
             0
-        ] = 0xaec693ed07aa507d71728090ebedeb0e25d51351f495c35278c25be542718022;
+        ] = 0x4e392f9a538c569512840e319e76c6e028f200637aefb11f61b09284e0b73f36;
         proof[
             1
-        ] = 0x47efe1e96eb55de81ceb6256c0675f6988e793a970faf02ee916fb57fedf81c0;
+        ] = 0xd09231cbdd71e51a66cb1a3a0a413d47f1cb58cccf1aa5c71a8f32659e92e7ea;
         proof[
             2
-        ] = 0x38304f8be20ffae66b97e9a904ff55eba372a6ca24dd9df466a6148a59b45eaf;
+        ] = 0x524f0abbfbb041ed6c056666eab19cffa358b3fe80b9fca1e0f6ddca3ca6a1b1;
         proof[
             3
-        ] = 0x454e4146b8041226f7eef6627de9db93a1b3e549ab55f147ebe416232fb4137b;
+        ] = 0x15b4033d5b058bbb565dc637b9aad7a68316b35fde5815d7e4b8c73feb6206af;
         proof[
             4
-        ] = 0x9fbfda72c6d95f5f1597c19dd025475dd2a6f6c5bfaba0b46e009d0be3ebcc93;
+        ] = 0x93a630a7988df6b8a70257fbd61463b032a39070b45a09bf6b1223d96d60eb27;
         proof[
             5
-        ] = 0xdaa1bd6551356d04cd836d1f76519b785b85493dcd42985ad85afaea6ed67f9b;
+        ] = 0x2a1e750c35bd07d983eeb0f1f44beccfabaf1113e35d81c2f5f2dcb8a35c95f3;
         proof[
             6
-        ] = 0x899091ff1eece7f2815b39003274dd9907f93fb2ddda52e072b3d065fc529ca4;
+        ] = 0x53c8d5252776cc075926ee0f4ce8430aba9f5f2317383ebe1aa94a49010097b3;
         proof[
             7
-        ] = 0x024679d9aa192a213c2395bda62eb41382440d2e5af5c7a01217212a950cb53d;
+        ] = 0x667a2ad411dfa6f6c5d9c70f6fb45c52891e147f43c5ffa2064ab41eccf4d5b0;
         proof[
             8
-        ] = 0x81786ec31574dd94fb56a722eb59d277f465b8ab2a22451d2ed67665d343e180;
+        ] = 0x66225259cad089344a6372872eb5722350cd0633c20696b90203c4456103dd4e;
         proof[
             9
-        ] = 0x110b4921fd1accdbe98a989cd3361726487463c8b6ab3cae580f7cd2c513d250;
+        ] = 0xc984a57a3473757af59b113010ac7632521e76369d7ced47998f49dee14ab1cd;
         proof[
             10
-        ] = 0xe3455c6f045b2f486dbf553018bccaa95d95a2864c1ddf90011e59d0bd31dc44;
-        uint256 txIndex = 1386;
-        // taskManager.processTimelockTx(taskId, merkleRoot, proof, txIndex);
+        ] = 0x2e526e8d65ad84d329e4ba779173bb1dff13a87672a1a60d64be4da1235d0b8c;
+        proof[
+            11
+        ] = 0x0a181f52043542baa4e82631c6f88b3f61c0fd3d9af35bc1af9e4a571ac5baf2;
 
-        // // failed to burn due to time not reached
-        // vm.expectRevert("Time not reached");
-        // taskManager.burn(taskId);
+        uint256 txIndex = 3029;
+        taskManager.processTimelockTx(
+            taskId,
+            rawHeader,
+            blockHeight,
+            proof,
+            txIndex
+        );
 
-        // // skip time
-        // skip(90 days);
+        // failed to burn due to time not reached
+        vm.expectRevert("Time not reached");
+        taskManager.burn(taskId);
 
-        // // burn failed due to insufficient balance
-        // vm.expectRevert();
-        // taskManager.burn(taskId);
+        // skip time
+        skip(90 days);
 
-        // // return the funds
-        // vm.prank(safeAddress);
-        // address(taskManager).call{value: 1 ether}("");
+        // burn failed due to insufficient balance
+        vm.expectRevert();
+        taskManager.burn(taskId);
 
-        // // burn funds
-        // taskManager.burn(taskId);
-        // assertEq(address(safeAddress).balance, 0);
+        // return the funds
+        vm.prank(safeAddress);
+        address(taskManager).call{value: 1 ether}("");
+
+        // burn funds
+        taskManager.burn(taskId);
+        assertEq(address(safeAddress).balance, 0);
     }
 }
