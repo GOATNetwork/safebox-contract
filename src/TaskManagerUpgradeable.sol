@@ -125,7 +125,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         );
         // Check if the address is a valid P2WPKH address
         require(
-            keccak256(_btcPubKey.pubKeyToP2WPKH(false)) ==
+            keccak256(_btcPubKey.pubKeyToP2WPKH(true)) ==
                 keccak256(_btcAddress),
             "Invalid btc address"
         );
