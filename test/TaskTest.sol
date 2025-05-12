@@ -25,7 +25,8 @@ contract TaskTest is Test {
         MockBridge mockBridge = new MockBridge();
         taskManager = new TaskManagerUpgradeable(
             address(mockBitcoin),
-            address(mockBridge)
+            address(mockBridge),
+            false
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(taskManager),

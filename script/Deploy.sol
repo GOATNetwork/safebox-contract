@@ -33,7 +33,8 @@ contract TaskTest is Script {
         // deploy contracts
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
             bitocin,
-            goatBridge
+            goatBridge,
+            true
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(taskManager),
@@ -55,7 +56,8 @@ contract TaskTest is Script {
     function deployLogic() public {
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
             bitocin,
-            goatBridge
+            goatBridge,
+            true
         );
         console.log(
             "TaskManagerUpgradeable logic address: ",

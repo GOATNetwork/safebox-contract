@@ -67,6 +67,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     address public immutable bitcoin;
     address public immutable bridge;
+    bool public immutable isMainnet;
 
     // Array of tasks
     Task[] public tasks;
@@ -74,9 +75,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     mapping(address depositAddress => uint256) public hasPendingTask; // 0/AVAILABLE_TASK_STATE: available
 
     // Constructor to initialize immutable variables
-    constructor(address _bitcoin, address _bridge) {
+    constructor(address _bitcoin, address _bridge, bool _isMainnet) {
         bitcoin = _bitcoin;
         bridge = _bridge;
+        isMainnet = _isMainnet;
         _disableInitializers();
     }
 
@@ -124,7 +126,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         );
         // Check if the address is a valid P2WPKH address
         require(
-            keccak256(_btcPubKey.pubKeyToP2WPKH(true)) ==
+            keccak256(_btcPubKey.pubKeyToP2WPKH(isMainnet)) ==
                 keccak256(_btcAddress),
             "Invalid btc address"
         );
