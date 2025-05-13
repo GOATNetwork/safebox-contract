@@ -21,6 +21,27 @@ OP_DROP
 OP_CHECKSIG
 ```
 
+### References
+```
+func BuildTimeLockScriptForP2WSH(pubKey []byte, lockTime time.Time, net *chaincfg.Params) ([]byte, error) {
+	posPubkey, err := btcec.ParsePubKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %v", err)
+	}
+	subScript, err := txscript.NewScriptBuilder().
+		AddInt64(lockTime.Unix()).
+		AddOp(txscript.OP_CHECKLOCKTIMEVERIFY).
+		AddOp(txscript.OP_DROP).
+		AddData(posPubkey.SerializeCompressed()).
+		AddOp(txscript.OP_CHECKSIG).Script()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build subscript: %v", err)
+	}
+	return subScript, nil
+}
+```
+https://github.com/GOATNetwork/goat-relayer/blob/main/internal/types/utils.go#L350
+
 ## Contracts Procedure
 
 - **Certificate Creation**: Use the `setupTask` function to set up a new certificate for partners. The certificate must meet specific conditions, such as a valid deadline, timelock, amount, etc.
