@@ -1,5 +1,8 @@
 # Bridge
 
+## Workflows
+![image](https://github.com/user-attachments/assets/37aaaba2-d56d-44cc-8a3e-b37a15cbf3de)
+
 ## Roles
 
 - **Users**: 
