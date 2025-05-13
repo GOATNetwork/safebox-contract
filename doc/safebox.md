@@ -1,5 +1,9 @@
 # Safebox-Transactions
 
+## Workflows
+![safebox-workflow](https://github.com/user-attachments/assets/f2cb8253-9aac-442e-914b-5d2efb6a7160)
+
+
 ## Roles
 
 - **Admin**: Has the authority to manage certificates, including creating, canceling, and forcibly destroying them.
