@@ -44,7 +44,7 @@ func BuildTimeLockScriptForP2WSH(pubKey []byte, lockTime time.Time, net *chaincf
 	return subScript, nil
 }
 ```
-https://github.com/GOATNetwork/goat-relayer/blob/main/internal/types/utils.go#L350
+https://github.com/GOATNetwork/goat-relayer/blob/0ea838b6e6bca79b4f255df3922646c2f8773eb2/internal/types/utils.go#L350
 
 ## Contracts Procedure
 
