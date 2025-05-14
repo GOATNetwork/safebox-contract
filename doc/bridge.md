@@ -1,5 +1,8 @@
 # Bridge
 
+## Workflows
+![image](https://github.com/user-attachments/assets/37aaaba2-d56d-44cc-8a3e-b37a15cbf3de)
+
 ## Roles
 
 - **Users**: 
@@ -19,7 +22,7 @@
   
     - **Relayer Group**
         - Managed by a multi-signature whitelist contract
-        - Member changes (add/remove) are submitted to Fireblocks persistence layer via /v2/config_change_sign_request
+        - Member changes (add/remove) are submitted to Fireblocks persistence layer
         - Fireblocks manages TSS private key shares
     - **Proposer**
         - Selected periodically from voters by consensus
@@ -32,12 +35,11 @@
     - **Replica**
         - Responsible for forwarding P2P messages
 
-- **Tss Layer**: 
+- **Fireblocks Network**: 
     - Manage threshold signature scheme (TSS) for Bitcoin transactions
     - Generate and manage deposit addresses
     - Sign withdrawal transactions
     - Maintain key shares security
-    - Coordinate with Fireblocks for key management
     - Handle member changes in the TSS group
   
 ## Deposit Flow
@@ -64,6 +66,50 @@ OP_DROP
 <pubkey>
 OP_CHECKSIG
 ```
+
+### References
+**Deposit**
+```
+export function buildDataEmbedScript(magicBytes: Buffer, evmAddress: Buffer): Buffer {
+  // Parameter validation
+  if (!Buffer.isBuffer(magicBytes) || magicBytes.length !== 4) {
+    throw new Error("magicBytes must be a Buffer of length 4");
+  }
+  if (!Buffer.isBuffer(evmAddress) || evmAddress.length !== 20) {
+    throw new Error("evmAddress must be a Buffer of length 20");
+  }
+
+  // Serialize data
+  const serializedStakingData = Buffer.concat([
+    magicBytes, // 4 bytes, endianess not applicable to byte array
+    evmAddress // 20 bytes, endianess not applicable to byte array
+  ]);
+
+  return script.compile([opcodes.OP_RETURN, serializedStakingData]);
+}
+```
+https://github.com/GOATNetwork/btc-script-factory/blob/193ae38d4d66f72adf4125df30e433dee10fbf74/lib/covenantV1/bridge.script.js#L38
+
+**Deposit Anywhere** 
+export function buildDepositScript(evmAddress: Buffer, posPubkey: Buffer): Buffer {
+  if (!Buffer.isBuffer(evmAddress) || !Buffer.isBuffer(posPubkey)) {
+    throw new Error("Invalid input types");
+  }
+  if (evmAddress.length !== ETH_PK_LENGTH) {
+    throw new Error("Invalid EVM address length");
+  }
+  if (posPubkey.length !== PK_LENGTH) {
+    throw new Error("Invalid public key length");
+  }
+
+  return script.compile([
+    evmAddress,
+    opcodes.OP_DROP,
+    posPubkey,
+    opcodes.OP_CHECKSIG
+  ]);
+}
+https://github.com/GOATNetwork/btc-script-factory/blob/193ae38d4d66f72adf4125df30e433dee10fbf74/src/covenantV1/bridge.script.ts#L11C17-L11C35
 
 ## Withdrawal Flow
 

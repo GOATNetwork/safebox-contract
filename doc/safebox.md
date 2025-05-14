@@ -1,5 +1,9 @@
 # Safebox-Transactions
 
+## Workflows
+![image](https://github.com/user-attachments/assets/f2cb8253-9aac-442e-914b-5d2efb6a7160)
+
+
 ## Roles
 
 - **Admin**: Has the authority to manage certificates, including creating, canceling, and forcibly destroying them.
@@ -20,6 +24,27 @@ OP_DROP
 <pubkey>
 OP_CHECKSIG
 ```
+
+### References
+```
+func BuildTimeLockScriptForP2WSH(pubKey []byte, lockTime time.Time, net *chaincfg.Params) ([]byte, error) {
+	posPubkey, err := btcec.ParsePubKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %v", err)
+	}
+	subScript, err := txscript.NewScriptBuilder().
+		AddInt64(lockTime.Unix()).
+		AddOp(txscript.OP_CHECKLOCKTIMEVERIFY).
+		AddOp(txscript.OP_DROP).
+		AddData(posPubkey.SerializeCompressed()).
+		AddOp(txscript.OP_CHECKSIG).Script()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build subscript: %v", err)
+	}
+	return subScript, nil
+}
+```
+https://github.com/GOATNetwork/goat-relayer/blob/0ea838b6e6bca79b4f255df3922646c2f8773eb2/internal/types/utils.go#L350
 
 ## Contracts Procedure
 
