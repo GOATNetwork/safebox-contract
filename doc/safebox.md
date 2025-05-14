@@ -10,23 +10,19 @@
 - **Relayer**: Responsible for receiving funds and initializing timelock transactions.
 - **Partner**: Provides the account address and sets up the certificate. For the same partner, only one certificate can be in progress at a time.
 
-## Main Bitcoin Transactions
+## Bitcoin Transactions
 
 - **Bridge-In (User Side)**: Partner send bridge-in transaction and get wrapped btc by evm address on GOAT Network
-- **Gen-Timelock-Utxo (Server Side)**: Relayer network detecting bridge-in transaction, the relayer-voter votes and then relayer-proposer send timelock-p2wsh which could be spent by the related partner. Proposer is elected in voters by random argorism.
-- **Recover-to-P2wpkh (User Side)**: Partner convert timelock-p2wsh utxo to normal address utxo
+- **Send-Timelock-Utxo (Server Side)**: Relayers detect bridge-in transaction, relayer-voters votes and then the relayer-proposer sends timelock-P2WSH which can be spent by the related partner. Proposer is elected in voters by random argorism.
+- **Spend-Timelock-Utxo (User Side)**: Partner spends timelock-P2WSH utxo
 
-### timelock-p2wsh witness script
+### P2WSH witness script
 ```
-<timestamp>
-OP_CHECKLOCKTIMEVERIFY
-OP_DROP
-<pubkey>
-OP_CHECKSIG
+<timestamp> OP_CHECKLOCKTIMEVERIFY OP_DROP <pubkey> OP_CHECKSIG
 ```
 
 ### References
-```
+``` go
 func BuildTimeLockScriptForP2WSH(pubKey []byte, lockTime time.Time, net *chaincfg.Params) ([]byte, error) {
 	posPubkey, err := btcec.ParsePubKey(pubKey)
 	if err != nil {

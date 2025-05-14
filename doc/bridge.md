@@ -5,19 +5,19 @@
 
 ## Roles
 
-- **Users**: 
+- **Users** 
     - Submit deposit transactions to Bitcoin network
     - Submit withdrawal requests through EVM
     - Monitor transaction status through bridge interface
     - Manage their wrapped BTC balance on L2
 
-- **Relayer**: 
+- **Relayer**
     - Manage cross-chain state and transaction consensus
     - Propose and validate Bitcoin block headers
     - Process deposit and withdrawal requests
-    - Maintain P2P network for communication
+    - Maintain P2P network communication
     - Generate and validate SPV proofs
-    - Sign withdrawal transactions
+    - Send withdrawal
     - Monitor Bitcoin network for new blocks and transactions
   
     - **Relayer Group**
@@ -54,22 +54,19 @@
 8. Execution layer confirms and increases balance for deposit address
 
 ### Versions
-There are 2 versions to contained L2 EVM address in the raw transaction, allow  L2 EVM address to be detected through consensus layer and add wrapped funds to L2 EVM address on execution layer. 
+There are two versions to contained L2 EVM address in the raw transaction, allow  L2 EVM address to be detected through consensus layer and add wrapped funds to L2 EVM address on execution layer. 
 
-**Deposit(P2wpkh with evm address in op_return)**: build a transaction with op_return txout which contained magic bytes and user evm address, and txout index 0 contains the receiving funds to the tss-servers managed address.  
+**Deposit by OP_RETURN**: build a transaction with op_return txout which contained magic bytes and user evm address, and txout index 0 contains the receiving funds to the tss-servers managed address.  
 
-**Deposit Anywhere(P2wsh with evm address in witness script)** evm address is contained in the witness script and could used to receiving funds on anywhere and anytime
+**Deposit by P2WSH** evm address is contained in the witness script and could used to receiving funds on anywhere and anytime
 ### bridge-in p2wsh witness script
 ```
-<evmAddress>
-OP_DROP
-<pubkey>
-OP_CHECKSIG
+<evmAddress> OP_DROP <pubkey> OP_CHECKSIG
 ```
 
 ### References
-**Deposit**
-```
+**Deposit by OP_RETURN**
+``` typescript
 export function buildDataEmbedScript(magicBytes: Buffer, evmAddress: Buffer): Buffer {
   // Parameter validation
   if (!Buffer.isBuffer(magicBytes) || magicBytes.length !== 4) {
@@ -90,7 +87,8 @@ export function buildDataEmbedScript(magicBytes: Buffer, evmAddress: Buffer): Bu
 ```
 https://github.com/GOATNetwork/btc-script-factory/blob/193ae38d4d66f72adf4125df30e433dee10fbf74/lib/covenantV1/bridge.script.js#L38
 
-**Deposit Anywhere** 
+**Deposit by P2WSH** 
+``` typescript
 export function buildDepositScript(evmAddress: Buffer, posPubkey: Buffer): Buffer {
   if (!Buffer.isBuffer(evmAddress) || !Buffer.isBuffer(posPubkey)) {
     throw new Error("Invalid input types");
@@ -109,6 +107,7 @@ export function buildDepositScript(evmAddress: Buffer, posPubkey: Buffer): Buffe
     opcodes.OP_CHECKSIG
   ]);
 }
+```
 https://github.com/GOATNetwork/btc-script-factory/blob/193ae38d4d66f72adf4125df30e433dee10fbf74/src/covenantV1/bridge.script.ts#L11C17-L11C35
 
 ## Withdrawal Flow
