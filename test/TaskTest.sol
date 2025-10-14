@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.27;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
@@ -47,39 +47,33 @@ contract TaskTest is Test {
     }
 
     function test_StandardProcess() public {
-        vm.prank(admin);
+        vm.prank(msgSender);
+        taskManager.grantRole(taskManager.OPERATOR_ROLE(), admin);
+
+        vm.startPrank(admin);
+        // configure globals and allowlists
+        taskManager.setTaskDeadline(uint32(1 days));
+        taskManager.setTimelockDuration(uint32(90 days));
+        taskManager.updateDepositAddress(safeAddress);
+
+        // register partner
         uint256 newPartnerId = 10;
-        bytes
-            memory btcAddress = hex"7462317165306b39743278306632367478723470373374303275617737716e637333343876637430656b";
-        bytes
-            memory btcPubKey = hex"038bc0a6e6b046ffdbd84aee9aea83d177c9f26f66d5f373949a78f6e774ca7f11";
-        taskManager.setupTask(
-            newPartnerId,
-            safeAddress,
-            uint32(block.timestamp + 90 days),
-            uint32(block.timestamp + 1 days),
-            1 ether,
-            btcAddress,
-            btcPubKey
-        );
+        bytes memory btcAddress = hex"7462317165306b39743278306632367478723470373374303275617737716e637333343876637430656b";
+        bytes memory btcPubKey = hex"038bc0a6e6b046ffdbd84aee9aea83d177c9f26f66d5f373949a78f6e774ca7f11";
+        taskManager.registerPartner(newPartnerId, btcAddress, btcPubKey);
+
+        // create task (new signature)
+        taskManager.setupTask(newPartnerId, safeAddress, 1 ether);
+        vm.stopPrank();
         uint256 taskId = 1;
 
         TaskManagerUpgradeable.Task memory task = taskManager.getTask(taskId);
         assertEq(task.partnerId, newPartnerId);
         assertEq(task.depositAddress, safeAddress);
         assertEq(uint8(task.state), 1);
-        assertEq(task.timelockEndTime, block.timestamp + 90 days);
+        assertEq(task.timelockEndTime, 0);
         assertEq(task.deadline, block.timestamp + 1 days);
         assertEq(task.amount, 1 ether);
-        assertEq(
-            task.btcAddress[0],
-            0x7462317165306b39743278306632367478723470373374303275617737716e63
-        );
-        assertEq(
-            task.btcPubKey[0],
-            0x038bc0a6e6b046ffdbd84aee9aea83d177c9f26f66d5f373949a78f6e774ca7f
-        );
-        assertEq(taskManager.partnerTasks(newPartnerId, 0), taskId);
         assertEq(taskManager.getPartnerTasks(newPartnerId).length, 1);
 
         // Send funds to the partner contract
@@ -89,7 +83,8 @@ contract TaskTest is Test {
 
         // receive funds
         vm.prank(relayer);
-        taskManager.receiveFunds(taskId, 1 ether, "Funding Tx Hash", 1234);
+        bytes32 fundingTxHash = keccak256("Funding Tx Hash");
+        taskManager.receiveFunds(taskId, 1 ether, fundingTxHash, 1234);
 
         bytes32[7] memory witnessScriptArray;
         bytes
@@ -99,7 +94,7 @@ contract TaskTest is Test {
         task = taskManager.getTask(taskId);
         assertEq(uint8(task.state), 3);
         assertEq(task.fundingTxOut, 1234);
-        assertEq(task.fundingTxHash, "Funding Tx Hash");
+        assertEq(task.fundingTxHash, fundingTxHash);
         assertEq(task.timelockTxOut, 4321);
         assertEq(
             task.timelockTxHash,

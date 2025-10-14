@@ -3,6 +3,7 @@ pragma solidity ^0.8.27;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IBitcoin} from "./interfaces/IBitcoin.sol";
 import {IBridge} from "./interfaces/IBridge.sol";
@@ -14,6 +15,7 @@ import {BtcParser} from "./libraries/BtcParser.sol";
  */
 contract TaskManagerUpgradeable is AccessControlUpgradeable {
     using BtcParser for bytes;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     enum TaskState {
         None,
@@ -54,6 +56,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         bytes32 fundingTxHash; // Tx hash of the btc tx
         bytes32 timelockTxHash; // Tx hash of the btc timelock
         bytes32[7] witnessScript; // witnessScript of the btc timelock
+    }
+
+    struct PartnerInfo {
         bytes32[2] btcAddress; // Bitcoin address associated with the task
         bytes32[2] btcPubKey; // Bitcoin public key associated with the task
     }
@@ -64,14 +69,22 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // submissions under this role come from different participants with off-chain consensus.
     // This setup enhances security and makes the role significantly harder to compromise.
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     address public immutable bitcoin;
     address public immutable bridge;
     bool public immutable isMainnet;
 
+    uint32 public taskDeadline;
+    uint32 public timelockDuration;
+
+    mapping(bytes32 keyHash => uint256 partnerId) private partnerIds;
+    mapping(uint256 partnerId => PartnerInfo) private partnerInfos;
     // Array of tasks
-    Task[] public tasks;
-    mapping(uint256 partnerId => uint256[]) public partnerTasks;
+    Task[] private tasks;
+    mapping(uint256 partnerId => uint256[]) private partnerTasks;
+
+    EnumerableSet.AddressSet private depositAddresses;
     mapping(address depositAddress => uint256) public hasPendingTask; // 0/AVAILABLE_TASK_STATE: available
 
     // Constructor to initialize immutable variables
@@ -94,10 +107,61 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         return tasks[_taskId];
     }
 
+    function getPartnerId(
+        bytes calldata _btcPubKey
+    ) external view returns (uint256) {
+        return partnerIds[keccak256(_btcPubKey)];
+    }
+
     function getPartnerTasks(
         uint256 _partnerId
     ) external view returns (uint256[] memory) {
         return partnerTasks[_partnerId];
+    }
+
+    function getPartnerInfo(
+        uint256 _partnerId
+    ) external view returns (PartnerInfo memory) {
+        return partnerInfos[_partnerId];
+    }
+
+    function setTaskDeadline(uint32 _taskDeadline) public onlyRole(ADMIN_ROLE) {
+        taskDeadline = _taskDeadline;
+    }
+
+    function setTimelockDuration(
+        uint32 _timelockDuration
+    ) public onlyRole(ADMIN_ROLE) {
+        timelockDuration = _timelockDuration;
+    }
+
+    function registerPartner(
+        uint256 _partnerId,
+        bytes calldata _btcAddress,
+        bytes calldata _btcPubKey
+    ) public onlyRole(ADMIN_ROLE) {
+        // Check if the address is a valid P2WPKH address
+        require(
+            keccak256(_btcPubKey.pubKeyToP2WPKH(isMainnet)) ==
+                keccak256(_btcAddress),
+            "Invalid btc address"
+        );
+        require(partnerIds[keccak256(_btcPubKey)] == 0, "Registered address");
+        partnerIds[keccak256(_btcPubKey)] = _partnerId;
+        partnerInfos[_partnerId] = PartnerInfo({
+            btcAddress: _btcAddress.bytesToBytes2(),
+            btcPubKey: _btcPubKey.bytesToBytes2()
+        });
+    }
+
+    function updateDepositAddress(
+        address _depositAddress
+    ) public onlyRole(ADMIN_ROLE) {
+        if (depositAddresses.contains(_depositAddress)) {
+            depositAddresses.remove(_depositAddress);
+        } else {
+            depositAddresses.add(_depositAddress);
+        }
     }
 
     /**
@@ -107,28 +171,24 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     function setupTask(
         uint256 _partnerId,
         address _depositAddress,
-        uint32 _timelockEndTime,
-        uint32 _deadline,
-        uint128 _amount,
-        bytes calldata _btcAddress,
-        bytes calldata _btcPubKey
-    ) public onlyRole(ADMIN_ROLE) {
-        require(_deadline > block.timestamp, "Invalid deadline");
-        require(_timelockEndTime > _deadline, "Invalid timelock");
+        uint128 _amount
+    ) public onlyRole(OPERATOR_ROLE) {
+        require(
+            partnerInfos[_partnerId].btcPubKey[1] != 0,
+            "Unregistered partner"
+        );
         require(
             _amount > MIN_DEPOSIT_AMOUNT && (_amount % 10 ** 12) == 0,
             "Invalid amount"
         );
         require(
+            depositAddresses.contains(_depositAddress),
+            "Invalid deposti address"
+        );
+        require(
             hasPendingTask[_depositAddress] == AVAILABLE_TASK_STATE ||
                 hasPendingTask[_depositAddress] == 0,
             "Task already exists"
-        );
-        // Check if the address is a valid P2WPKH address
-        require(
-            keccak256(_btcPubKey.pubKeyToP2WPKH(isMainnet)) ==
-                keccak256(_btcAddress),
-            "Invalid btc address"
         );
 
         uint256 taskId = tasks.length;
@@ -138,8 +198,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                 partnerId: _partnerId,
                 depositAddress: _depositAddress,
                 state: TaskState.Created,
-                timelockEndTime: _timelockEndTime,
-                deadline: _deadline,
+                timelockEndTime: 0,
+                deadline: uint32(block.timestamp) + taskDeadline,
                 amount: _amount,
                 fundingTxOut: 0,
                 timelockTxOut: 0,
@@ -153,9 +213,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
                     bytes32(0),
                     bytes32(0),
                     bytes32(0)
-                ],
-                btcAddress: _btcAddress.bytesToBytes2(),
-                btcPubKey: _btcPubKey.bytesToBytes2()
+                ]
             })
         );
         partnerTasks[_partnerId].push(taskId);
@@ -188,6 +246,9 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
+        tasks[_taskId].timelockEndTime =
+            uint32(block.timestamp) +
+            timelockDuration;
         tasks[_taskId].state = TaskState.Received; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;
