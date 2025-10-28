@@ -6,14 +6,10 @@ import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
 import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
 
 contract TaskTest is Script {
-    address public admin;
-    address public relayer;
     address public bitocin;
     address public goatBridge;
 
     function setUp() public virtual {
-        admin = vm.envAddress("ADMIN_ADDR");
-        relayer = vm.envAddress("RELAYER_ADDR");
         bitocin = vm.envAddress("BITCOIN_CONTRACT");
         goatBridge = vm.envAddress("GOAT_BRIDGE_CONTRACT");
     }
@@ -23,28 +19,36 @@ contract TaskTest is Script {
         address deployer = vm.createWallet(deployerPrivateKey).addr;
         vm.startBroadcast(deployerPrivateKey);
 
-        deployFull(admin);
+        deployFull(deployer);
         // deployLogic();
 
         vm.stopBroadcast();
     }
 
     function deployFull(address _proxyAdmin) public {
+        address admin = vm.envAddress("ADMIN_ADDR");
+        address operator = vm.envAddress("OPERATOR_ADDR");
+        address relayer = vm.envAddress("RELAYER_ADDR");
+
         // deploy contracts
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
             bitocin,
             goatBridge,
-            true
+            false
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(taskManager),
             _proxyAdmin,
-            abi.encodeWithSelector(TaskManagerUpgradeable.initialize.selector)
+            abi.encodeWithSelector(
+                TaskManagerUpgradeable.initialize.selector,
+                200
+            )
         );
         taskManager = TaskManagerUpgradeable(payable(proxy));
 
         // grant roles
         taskManager.grantRole(taskManager.ADMIN_ROLE(), admin);
+        taskManager.grantRole(taskManager.OPERATOR_ROLE(), operator);
         taskManager.grantRole(taskManager.RELAYER_ROLE(), relayer);
 
         console.log(

@@ -31,7 +31,10 @@ contract TaskTest is Test {
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(taskManager),
             admin,
-            abi.encodeWithSelector(TaskManagerUpgradeable.initialize.selector)
+            abi.encodeWithSelector(
+                TaskManagerUpgradeable.initialize.selector,
+                1
+            )
         );
         taskManager = TaskManagerUpgradeable(payable(proxy));
 
@@ -58,8 +61,10 @@ contract TaskTest is Test {
 
         // register partner
         uint256 newPartnerId = 10;
-        bytes memory btcAddress = hex"7462317165306b39743278306632367478723470373374303275617737716e637333343876637430656b";
-        bytes memory btcPubKey = hex"038bc0a6e6b046ffdbd84aee9aea83d177c9f26f66d5f373949a78f6e774ca7f11";
+        bytes
+            memory btcAddress = hex"7462317165306b39743278306632367478723470373374303275617737716e637333343876637430656b";
+        bytes
+            memory btcPubKey = hex"038bc0a6e6b046ffdbd84aee9aea83d177c9f26f66d5f373949a78f6e774ca7f11";
         taskManager.registerPartner(newPartnerId, btcAddress, btcPubKey);
 
         // create task (new signature)

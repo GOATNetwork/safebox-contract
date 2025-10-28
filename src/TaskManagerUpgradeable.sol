@@ -75,13 +75,14 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     address public immutable bridge;
     bool public immutable isMainnet;
 
+    uint32 public nextTaskId;
     uint32 public taskDeadline;
     uint32 public timelockDuration;
 
     mapping(bytes32 keyHash => uint256 partnerId) private partnerIds;
     mapping(uint256 partnerId => PartnerInfo) private partnerInfos;
     // Array of tasks
-    Task[] private tasks;
+    mapping(uint256 => Task) private tasks;
     mapping(uint256 partnerId => uint256[]) private partnerTasks;
 
     EnumerableSet.AddressSet private depositAddresses;
@@ -96,11 +97,13 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     }
 
     // Initializer function for upgradeable contracts
-    function initialize() public initializer {
+    function initialize(uint32 _initTaskId) public initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // push an empty task to avoid index 0
-        tasks.push();
+
+        nextTaskId = _initTaskId;
+        taskDeadline = 1 days;
+        timelockDuration = 90 days;
     }
 
     function getTask(uint256 _taskId) external view returns (Task memory) {
@@ -126,12 +129,14 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     }
 
     function setTaskDeadline(uint32 _taskDeadline) public onlyRole(ADMIN_ROLE) {
+        require(_taskDeadline > 0, "Invalid deadline");
         taskDeadline = _taskDeadline;
     }
 
     function setTimelockDuration(
         uint32 _timelockDuration
     ) public onlyRole(ADMIN_ROLE) {
+        require(_timelockDuration > 0, "Invalid timelock duration");
         timelockDuration = _timelockDuration;
     }
 
@@ -191,31 +196,29 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             "Task already exists"
         );
 
-        uint256 taskId = tasks.length;
+        uint256 taskId = nextTaskId++;
         hasPendingTask[_depositAddress] = taskId;
-        tasks.push(
-            Task({
-                partnerId: _partnerId,
-                depositAddress: _depositAddress,
-                state: TaskState.Created,
-                timelockEndTime: 0,
-                deadline: uint32(block.timestamp) + taskDeadline,
-                amount: _amount,
-                fundingTxOut: 0,
-                timelockTxOut: 0,
-                fundingTxHash: 0,
-                timelockTxHash: 0,
-                witnessScript: [
-                    bytes32(0),
-                    bytes32(0),
-                    bytes32(0),
-                    bytes32(0),
-                    bytes32(0),
-                    bytes32(0),
-                    bytes32(0)
-                ]
-            })
-        );
+        tasks[taskId] = Task({
+            partnerId: _partnerId,
+            depositAddress: _depositAddress,
+            state: TaskState.Created,
+            timelockEndTime: 0,
+            deadline: uint32(block.timestamp) + taskDeadline,
+            amount: _amount,
+            fundingTxOut: 0,
+            timelockTxOut: 0,
+            fundingTxHash: 0,
+            timelockTxHash: 0,
+            witnessScript: [
+                bytes32(0),
+                bytes32(0),
+                bytes32(0),
+                bytes32(0),
+                bytes32(0),
+                bytes32(0),
+                bytes32(0)
+            ]
+        });
         partnerTasks[_partnerId].push(taskId);
         emit TaskCreated(taskId);
     }
