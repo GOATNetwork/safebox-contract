@@ -33,7 +33,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Events
     event TaskCreated(uint256 taskId);
     event TaskCancelled(uint256 taskId);
-    event FundsReceived(uint256 taskId, bytes32 fundingTxHash, uint32 txOut);
+    event FundsReceived(uint256 taskId, bytes32 fundingTxHash, uint32 txOut, uint32 timelockEndTime);
     event TimelockInitialized(
         uint256 taskId,
         bytes32 timelockTxHash,
@@ -247,7 +247,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             "Tx not found"
         );
         uint32 computedTimelockEndTime = uint32(block.timestamp) + timelockDuration;
-        tasks[_taskId].timelockEndTime = computedTimelockEndTime
+        tasks[_taskId].timelockEndTime = computedTimelockEndTime;
         tasks[_taskId].state = TaskState.Received; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;
