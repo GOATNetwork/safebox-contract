@@ -246,13 +246,12 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
-        tasks[_taskId].timelockEndTime =
-            uint32(block.timestamp) +
-            timelockDuration;
+        uint32 computedTimelockEndTime = uint32(block.timestamp) + timelockDuration;
+        tasks[_taskId].timelockEndTime = computedTimelockEndTime
         tasks[_taskId].state = TaskState.Received; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;
-        emit FundsReceived(_taskId, _fundingTxHash, _txOut);
+        emit FundsReceived(_taskId, _fundingTxHash, _txOut, computedTimelockEndTime);
     }
 
     /**
