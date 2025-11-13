@@ -17,6 +17,7 @@ contract TaskTest is Script {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.createWallet(deployerPrivateKey).addr;
+        console.log("deployer: ", deployer);
         vm.startBroadcast(deployerPrivateKey);
 
         deployFull(deployer);
@@ -34,7 +35,7 @@ contract TaskTest is Script {
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
             bitocin,
             goatBridge,
-            false
+            true
         );
         UpgradeableProxy proxy = new UpgradeableProxy(
             address(taskManager),

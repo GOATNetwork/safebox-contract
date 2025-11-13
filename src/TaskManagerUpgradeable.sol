@@ -29,11 +29,18 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Constants
     uint256 public constant AVAILABLE_TASK_STATE = type(uint256).max;
     uint256 public constant MIN_DEPOSIT_AMOUNT = 5 * 10 ** 14; // Minimum deposit amount in satoshis
+    uint256 public constant MIN_DEADLINE = 43200;
+    uint256 public constant MIN_LOCK_DURATION = 86400;
 
     // Events
     event TaskCreated(uint256 taskId);
     event TaskCancelled(uint256 taskId);
-    event FundsReceived(uint256 taskId, bytes32 fundingTxHash, uint32 txOut, uint32 timelockEndTime);
+    event FundsReceived(
+        uint256 taskId,
+        bytes32 fundingTxHash,
+        uint32 txOut,
+        uint32 timelockEndTime
+    );
     event TimelockInitialized(
         uint256 taskId,
         bytes32 timelockTxHash,
@@ -129,14 +136,19 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     }
 
     function setTaskDeadline(uint32 _taskDeadline) public onlyRole(ADMIN_ROLE) {
-        require(_taskDeadline > 0, "Invalid deadline");
+        require(_taskDeadline > MIN_DEADLINE, "Deadline below min");
+        require(_taskDeadline < timelockDuration, "Invalid deadline");
         taskDeadline = _taskDeadline;
     }
 
     function setTimelockDuration(
         uint32 _timelockDuration
     ) public onlyRole(ADMIN_ROLE) {
-        require(_timelockDuration > 0, "Invalid timelock duration");
+        require(
+            _timelockDuration > MIN_LOCK_DURATION,
+            "Timelock duration below min"
+        );
+        require(_timelockDuration > taskDeadline, "Invalid timelock duration");
         timelockDuration = _timelockDuration;
     }
 
@@ -243,18 +255,23 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         uint32 _txOut
     ) public onlyRole(RELAYER_ROLE) {
         require(tasks[_taskId].state == TaskState.Created, "Invalid task");
-        require(block.timestamp <= tasks[_taskId].deadline, "Task expired");
         require(_amount == tasks[_taskId].amount, "Invalid amount");
         require(
             IBridge(bridge).isDeposited(_fundingTxHash, _txOut),
             "Tx not found"
         );
-        uint32 computedTimelockEndTime = uint32(block.timestamp) + timelockDuration;
+        uint32 computedTimelockEndTime = uint32(block.timestamp) +
+            timelockDuration;
         tasks[_taskId].timelockEndTime = computedTimelockEndTime;
         tasks[_taskId].state = TaskState.Received; // Task state is set to 'received'
         tasks[_taskId].fundingTxHash = _fundingTxHash;
         tasks[_taskId].fundingTxOut = _txOut;
-        emit FundsReceived(_taskId, _fundingTxHash, _txOut, computedTimelockEndTime);
+        emit FundsReceived(
+            _taskId,
+            _fundingTxHash,
+            _txOut,
+            computedTimelockEndTime
+        );
     }
 
     /**
