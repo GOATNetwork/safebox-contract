@@ -139,7 +139,7 @@ library BtcParser {
         }
     }
 
-    /* ===== 辅助：8-bit → 5-bit ===== */
+    /* ===== 8-bit → 5-bit ===== */
     function _convertBits(
         bytes memory data
     ) internal pure returns (uint8[] memory) {
