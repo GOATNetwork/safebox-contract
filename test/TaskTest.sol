@@ -56,7 +56,7 @@ contract TaskTest is Test {
         // configure globals and allowlists
         taskManager.setTaskDeadline(uint32(1 days));
         taskManager.setTimelockDuration(uint32(90 days));
-        taskManager.updateDepositAddress(safeAddress);
+        taskManager.updateSafeboxAddress(safeAddress);
 
         // register partner
         uint256 newPartnerId = 10;
@@ -73,7 +73,7 @@ contract TaskTest is Test {
 
         TaskManagerUpgradeable.Task memory task = taskManager.getTask(taskId);
         assertEq(task.partnerId, newPartnerId);
-        assertEq(task.depositAddress, safeAddress);
+        assertEq(task.safeboxAddress, safeAddress);
         assertEq(uint8(task.state), 1);
         assertEq(task.timelockEndTime, 0);
         assertEq(task.deadline, block.timestamp + 1 days);

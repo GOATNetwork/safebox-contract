@@ -31,7 +31,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
 
     // Constants
     uint256 public constant AVAILABLE_TASK_STATE = type(uint256).max;
-    uint256 public constant MIN_DEPOSIT_AMOUNT = 5 * 10 ** 14; // Minimum deposit amount in satoshis
+    uint256 public constant MIN_AMOUNT = 5 * 10 ** 14; // Minimum transfer amount in satoshis
     uint256 public constant MIN_DEADLINE = 43200;
     uint256 public constant MIN_LOCK_DURATION = 86400;
 
@@ -56,7 +56,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Struct representing a task
     struct Task {
         uint256 partnerId; // Address of the associated partner
-        address depositAddress; // Address where the funds are deposited
+        address safeboxAddress; // Address where the funds are kept
         TaskState state; // Task state: 0 (default/cancelled), 1 (created), 2 (received), 3, (init timelock), 4(confirmed) 5 (completed)
         uint32 timelockEndTime; // Timestamp when the timelock of the funds expires
         uint32 deadline; // Timestamp when the task is considered expired
@@ -95,8 +95,8 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     mapping(uint256 => Task) private tasks;
     mapping(uint256 partnerId => uint256[]) private partnerTasks;
 
-    EnumerableSet.AddressSet private depositAddresses;
-    mapping(address depositAddress => uint256) public hasPendingTask; // 0/AVAILABLE_TASK_STATE: available
+    EnumerableSet.AddressSet private safeboxAddresses;
+    mapping(address safeboxAddress => uint256) public hasPendingTask; // 0/AVAILABLE_TASK_STATE: available
 
     // Constructor to initialize immutable variables
     constructor(address _bitcoin, address _bridge, bool _isMainnet) {
@@ -174,13 +174,13 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         });
     }
 
-    function updateDepositAddress(
-        address _depositAddress
+    function updateSafeboxAddress(
+        address _safeboxAddress
     ) public onlyRole(ADMIN_ROLE) {
-        if (depositAddresses.contains(_depositAddress)) {
-            depositAddresses.remove(_depositAddress);
+        if (safeboxAddresses.contains(_safeboxAddress)) {
+            safeboxAddresses.remove(_safeboxAddress);
         } else {
-            depositAddresses.add(_depositAddress);
+            safeboxAddresses.add(_safeboxAddress);
         }
     }
 
@@ -190,7 +190,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function setupTask(
         uint256 _partnerId,
-        address _depositAddress,
+        address _safeboxAddress,
         uint128 _amount
     ) public onlyRole(OPERATOR_ROLE) {
         require(
@@ -198,24 +198,24 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             "Unregistered partner"
         );
         require(
-            _amount > MIN_DEPOSIT_AMOUNT && (_amount % 10 ** 12) == 0,
+            _amount > MIN_AMOUNT && (_amount % 10 ** 12) == 0,
             "Invalid amount"
         );
         require(
-            depositAddresses.contains(_depositAddress),
-            "Invalid deposti address"
+            safeboxAddresses.contains(_safeboxAddress),
+            "Invalid safebox address"
         );
         require(
-            hasPendingTask[_depositAddress] == AVAILABLE_TASK_STATE ||
-                hasPendingTask[_depositAddress] == 0,
+            hasPendingTask[_safeboxAddress] == AVAILABLE_TASK_STATE ||
+                hasPendingTask[_safeboxAddress] == 0,
             "Task already exists"
         );
 
         uint256 taskId = nextTaskId++;
-        hasPendingTask[_depositAddress] = taskId;
+        hasPendingTask[_safeboxAddress] = taskId;
         tasks[taskId] = Task({
             partnerId: _partnerId,
-            depositAddress: _depositAddress,
+            safeboxAddress: _safeboxAddress,
             state: TaskState.Created,
             timelockEndTime: 0,
             deadline: uint32(block.timestamp) + taskDeadline,
@@ -243,7 +243,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
      */
     function cancelTask(uint256 _taskId) public onlyRole(ADMIN_ROLE) {
         require(tasks[_taskId].state == TaskState.Created, "Invalid task");
-        hasPendingTask[tasks[_taskId].depositAddress] = AVAILABLE_TASK_STATE;
+        hasPendingTask[tasks[_taskId].safeboxAddress] = AVAILABLE_TASK_STATE;
         delete tasks[_taskId];
         emit TaskCancelled(_taskId);
     }
@@ -335,7 +335,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             ),
             "Invalid proof"
         );
-        hasPendingTask[tasks[_taskId].depositAddress] = AVAILABLE_TASK_STATE;
+        hasPendingTask[tasks[_taskId].safeboxAddress] = AVAILABLE_TASK_STATE;
         tasks[_taskId].state = TaskState.Confirmed; // Task state is set to 'confirmed'
         emit TimelockProcessed(_taskId);
     }
