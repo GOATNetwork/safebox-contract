@@ -6,11 +6,11 @@ import {TaskManagerUpgradeable} from "../src/TaskManagerUpgradeable.sol";
 import {UpgradeableProxy} from "../src/UpgradeableProxy.sol";
 
 contract TaskTest is Script {
-    address public bitocin;
+    address public bitcoin;
     address public goatBridge;
 
     function setUp() public virtual {
-        bitocin = vm.envAddress("BITCOIN_CONTRACT");
+        bitcoin = vm.envAddress("BITCOIN_CONTRACT");
         goatBridge = vm.envAddress("GOAT_BRIDGE_CONTRACT");
     }
 
@@ -33,7 +33,7 @@ contract TaskTest is Script {
 
         // deploy contracts
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
-            bitocin,
+            bitcoin,
             goatBridge,
             true
         );
@@ -60,7 +60,7 @@ contract TaskTest is Script {
 
     function deployLogic() public {
         TaskManagerUpgradeable taskManager = new TaskManagerUpgradeable(
-            bitocin,
+            bitcoin,
             goatBridge,
             true
         );
