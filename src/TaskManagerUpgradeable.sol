@@ -173,6 +173,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             "Invalid btc address"
         );
         require(partnerIds[keccak256(_btcPubKey)] == 0, "Registered address");
+        require(
+            partnerInfos[_partnerId].btcPubKey[1] == 0,
+            "Registered partner"
+        );
         partnerIds[keccak256(_btcPubKey)] = _partnerId;
         partnerInfos[_partnerId] = PartnerInfo({
             btcAddress: _btcAddress.bytesToBytes2(),
