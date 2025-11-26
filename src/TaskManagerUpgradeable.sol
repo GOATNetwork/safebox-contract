@@ -38,6 +38,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     // Events
     event TaskCreated(uint256 taskId);
     event TaskCancelled(uint256 taskId);
+    event TaskDeadlineUpdated(uint32 newDeadline);
+    event TimelockDurationUpdated(uint32 newDuration);
+    event PartnerRegistered(uint256 partnerId, bytes32[2] btcAddress);
+    event SafeboxAddressUpdated(address safebox, bool enabled);
     event FundsReceived(
         uint256 taskId,
         bytes32 fundingTxHash,
@@ -142,6 +146,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         require(_taskDeadline > MIN_DEADLINE, "Deadline below min");
         require(_taskDeadline < timelockDuration, "Invalid deadline");
         taskDeadline = _taskDeadline;
+        emit TaskDeadlineUpdated(_taskDeadline);
     }
 
     function setTimelockDuration(
@@ -153,6 +158,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
         );
         require(_timelockDuration > taskDeadline, "Invalid timelock duration");
         timelockDuration = _timelockDuration;
+        emit TimelockDurationUpdated(_timelockDuration);
     }
 
     function registerPartner(
@@ -172,6 +178,7 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
             btcAddress: _btcAddress.bytesToBytes2(),
             btcPubKey: _btcPubKey.bytesToBytes2()
         });
+        emit PartnerRegistered(_partnerId, _btcAddress.bytesToBytes2());
     }
 
     function updateSafeboxAddress(
@@ -179,8 +186,10 @@ contract TaskManagerUpgradeable is AccessControlUpgradeable {
     ) public onlyRole(ADMIN_ROLE) {
         if (safeboxAddresses.contains(_safeboxAddress)) {
             safeboxAddresses.remove(_safeboxAddress);
+            emit SafeboxAddressUpdated(_safeboxAddress, false);
         } else {
             safeboxAddresses.add(_safeboxAddress);
+            emit SafeboxAddressUpdated(_safeboxAddress, true);
         }
     }
 
