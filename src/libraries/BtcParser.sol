@@ -224,10 +224,7 @@ library BtcParser {
         bytes memory pubkey,
         bool mainnet
     ) public pure returns (bytes memory) {
-        require(
-            pubkey.length == 33 || pubkey.length == 65,
-            "Invalid pubkey length"
-        );
+        require(pubkey.length == 33, "Invalid pubkey length");
         bytes20 h160 = _hash160(pubkey);
 
         return h160ToP2WPKH(h160, mainnet);
